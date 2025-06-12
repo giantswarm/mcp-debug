@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/chzyer/readline v1.5.1
-	github.com/mark3labs/mcp-go v0.31.1-0.20250603084401-2cbaebf51e36
+	github.com/mark3labs/mcp-go v0.32.0
 	github.com/spf13/cobra v1.9.1
 )
 
