@@ -1,0 +1,317 @@
+---
+description: Guide for using Task Master to manage task-driven development workflows
+globs: **/*
+alwaysApply: true
+---
+# Task Master Development Workflow
+This guide outlines the typical process for using Task Master to manage software development projects.
+
+# The Development Workflow
+
+This document outlines the standard, iterative process for all development work. Following this workflow is **mandatory** to ensure consistency, quality, and effective collaboration across the project.
+
+## The Core Development Loop
+
+All work, from new features to bug fixes, follows this fundamental three-phase cycle:
+
+1.  **Phase 1: Planning & Alignment**
+    -   Select an issue from the backlog.
+    -   Create a dedicated branch for your work.
+    -   Explore the codebase to create a detailed implementation strategy.
+
+2.  **Phase 2: Iterative Implementation**
+    -   **Log your plan first.** Document your intended changes in the relevant task *before* writing code.
+    -   Implement the changes, adhering to the project's architectural guidelines.
+    -   Continuously log progress, discoveries, and setbacks as you work to create a rich history of the task.
+
+3.  **Phase 3: Finalization & Committing**
+    -   Write and pass all required tests.
+    -   Format your code according to project standards.
+    -   Update any relevant project rules based on your changes.
+    -   Commit your work using a structured, conventional commit message.
+    -   Close the corresponding issue.
+
+---
+
+## Phase 1: Planning & Alignment
+
+Before writing a single line of implementation code, you must have a clear plan and be working on the correct branch.
+
+### 1.1. Select an Issue & State Your Intent
+
+1.  **List Open Issues:** Use `mcp_github_list_issues` to see available tasks for `giantswarm/mcp-debug`.
+2.  **Choose an Issue:** Select the highest-priority issue you are able to work on.
+3.  **Get Details:** Use `mcp_github_get_issue` to retrieve its full details.
+4.  **Announce Your Plan:** In the chat, you **MUST** summarize the issue (title, number) and your intended high-level approach.
+    -   **Example:** *"I am starting work on issue #37: Refactor Capability API. My plan is to start by defining the new interfaces in the API package..."*
+
+### 1.2. Create a Dedicated Git Branch
+
+**NEVER** commit directly to the `main` branch.
+
+1.  **Check Your Current Branch:** Run `git rev-parse --abbrev-ref HEAD`.
+2.  **Create a New Branch:** If you are on `main`, create a new branch immediately. Branch names **MUST** follow this format:
+    > `<type>/issue-<number>-<kebab-case-title>`
+3.  **Branch Types:** `feature`, `fix`, `refactor`, `docs`, `test`, `chore`.
+4.  **Example:** `git checkout -b feature/issue-42-add-prometheus-provider`
+
+### 1.3. Explore and Plan
+
+This is a critical step to ensure your implementation is well-considered.
+
+1.  **Explore the Codebase:** Identify the specific files, functions, and lines of code that need to be added, removed, or changed.
+2.  **Formulate a Detailed Plan:** Based on your exploration, create a precise implementation plan. What is the exact diff you intend to apply? What potential challenges do you foresee? This plan will be logged in the next step.
+
+---
+
+## Phase 2: Iterative Implementation & Logging
+
+This cycle is the heart of the workflow. It's designed to build a rich, contextual history of the implementation, which is invaluable for debugging, collaboration, and future reference.
+
+### 2.1. Log Your Plan *Before* Coding
+
+1.  Before you start implementing, log the detailed plan you created in step 1.3.
+2.  Use the `mcp_taskmaster-ai_update_subtask` tool. The prompt should be a complete summary of your findings and your intended approach.
+3.  Verify that the plan was successfully logged by viewing the task details again.
+
+### 2.2. Implement & Log Progress
+
+1.  **Set Task Status:** Mark the task as `in-progress` (e.g., `mcp_taskmaster-ai_set_task_status --id=<subtaskId> --status=in-progress`).
+2.  **Write Code:** Begin writing code according to your plan and the project's [architecture.md](mdc:.roo/rules/architecture.md).
+3.  **Log Continuously:** As you work, you will learn things. **You must log them.** Regularly use `mcp_taskmaster-ai_update_subtask` to append new findings.
+    -   ✅ **What Worked:** Confirmed approaches, "fundamental truths."
+    -   ❌ **What Didn't Work:** Dead ends, failed experiments, and why.
+    -   ⚙️ **Specifics:** Successful code snippets, configurations, or commands.
+    -   🗣️ **Decisions:** Any choices made, especially if confirmed with the user.
+
+---
+
+## Phase 3: Finalization & Committing
+
+### 3.1. Pre-Commit Quality Check
+
+Before **every** commit, you **MUST** perform these checks:
+
+1.  **Format Code:**
+    ```bash
+    goimports -w .
+    go fmt ./...
+    ```
+2.  **Run All Tests:**
+    ```bash
+    make test
+    ```
+    -   **DO NOT** commit if any tests are failing. Fix the tests first.
+    -   Code must meet the test coverage minimums defined in [architecture.md](mdc:.roo/rules/architecture.md).
+3.  **Update TUI Snapshots (if applicable):**
+    -   If you made changes to the TUI, update the golden files: `NO_COLOR=true go test ./internal/tui/view/... -update`.
+    -   Review the changes to ensure they are intentional.
+
+### 3.2. Review & Update Rules
+
+1.  Review your implementation and the chat history.
+2.  Identify any new patterns, conventions, or best practices that emerged.
+3.  Update existing rules or create new ones, following the guidelines in [cursor_rules.md](mdc:.roo/rules/cursor_rules.md). This is a critical step for our collective improvement.
+
+### 3.3. Craft the Commit Message
+
+Commit messages are vital documentation. They **MUST** follow the [Conventional Commits](mdc:https:/www.conventionalcommits.org/en/v1.0.0) specification.
+
+**Structure:**
+```
+<type>(<scope>): <subject>
+<BLANK LINE>
+<body>
+<BLANK LINE>
+<footer>
+```
+-   **Type:** `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `style`, `perf`, `ci`, `build`.
+-   **Scope (Optional):** The area of the codebase affected (e.g., `api`, `tui`, `capability`).
+-   **Subject:** A short, imperative-tense summary. No period at the end.
+-   **Body (Recommended):** Explain the *what* and *why* of the change.
+-   **Footer:** Reference the issue being closed using `Closes #<issue_number>`. This automatically links the commit to the issue and closes it. Include `BREAKING CHANGE:` for any backward-incompatible changes.
+
+**Example:**
+```
+feat(api): Add GetWorkflow handler
+
+Implement the GetWorkflow function in the API layer to allow services
+to retrieve workflow definitions by name. This is a prerequisite
+for the workflow execution engine.
+
+Closes #52
+```
+
+### 3.4. Commit, Push, and Finalize
+
+1.  **Commit Changes:**
+    ```bash
+    git add .
+    git commit -m "..."
+    ```
+2.  **Push Branch:**
+    ```bash
+    git push origin <your-branch-name>
+    ```
+3.  **Mark Task Done:** Set the task status to `done` (e.g., `mcp_taskmaster-ai_set_task_status --id=<subtaskId> --status=done`).
+4.  **Announce Completion:** Inform the user that your changes have been pushed and the issue has been closed.
+
+## Task Management Using Task Master
+
+This project uses **Task Master** for task management. While the principles of the workflow above are universal, the specific commands below relate to this tool.
+
+-   **Primary Interaction:** The `mcp_taskmaster-ai_*` tools are the preferred method of interaction. The `task-master` CLI is a fallback. See [taskmaster.md](mdc:.roo/rules/taskmaster.md) for a full command reference.
+-   **Project Setup:** New projects start with `mcp_taskmaster-ai_initialize_project` or by parsing a requirements document with `mcp_taskmaster-ai_parse_prd`.
+-   **Task Breakdown:**
+    -   Before implementation, complex tasks should be analyzed (`mcp_taskmaster-ai_analyze_project_complexity`) and then broken down into subtasks (`mcp_taskmaster-ai_expand_task`).
+    -   Use the `--force` flag to replace existing subtasks if the breakdown needs to be redone.
+-   **Handling Change:** If an implementation choice affects future work, update the upcoming tasks using `mcp_taskmaster-ai_update` (for multiple tasks) or `mcp_taskmaster-ai_update_task` (for a single task).
+-   **Dependencies:** Maintain a clear order of operations by managing prerequisites with `mcp_taskmaster-ai_add_dependency` and `mcp_taskmaster-ai_remove_dependency`.
+-   **Reorganization:** Use `mcp_taskmaster-ai_move_task` to refactor the task hierarchy as the project evolves.
+- **status**: Current state of the task (Example: `"pending"`, `"done"`, `"deferred"`)
+- **dependencies**: IDs of prerequisite tasks (Example: `[1, 2.1]`)
+    - Dependencies are displayed with status indicators (✅ for completed, ⏱️ for pending)
+    - This helps quickly identify which prerequisite tasks are blocking work
+- **priority**: Importance level (Example: `"high"`, `"medium"`, `"low"`)
+- **details**: In-depth implementation instructions (Example: `"Use GitHub client ID/secret, handle callback, set session token."`) 
+- **testStrategy**: Verification approach (Example: `"Deploy and call endpoint to confirm 'Hello World' response."`) 
+- **subtasks**: List of smaller, more specific tasks (Example: `[{"id": 1, "title": "Configure OAuth", ...}]`) 
+- Refer to task structure details (previously linked to `tasks.md`).
+
+## Configuration Management (Updated)
+
+Taskmaster configuration is managed through two main mechanisms:
+
+1.  **`.taskmaster/config.json` File (Primary):**
+    *   Located in the project root directory.
+    *   Stores most configuration settings: AI model selections (main, research, fallback), parameters (max tokens, temperature), logging level, default subtasks/priority, project name, etc.
+    *   **Managed via `task-master models --setup` command.** Do not edit manually unless you know what you are doing.
+    *   **View/Set specific models via `task-master models` command or `models` MCP tool.**
+    *   Created automatically when you run `task-master models --setup` for the first time.
+
+2.  **Environment Variables (`.env` / `mcp.json`):**
+    *   Used **only** for sensitive API keys and specific endpoint URLs.
+    *   Place API keys (one per provider) in a `.env` file in the project root for CLI usage.
+    *   For MCP/Roo Code integration, configure these keys in the `env` section of `.roo/mcp.json`.
+    *   Available keys/variables: See `assets/env.example` or the Configuration section in the command reference (previously linked to `taskmaster.md`).
+
+**Important:** Non-API key settings (like model selections, `MAX_TOKENS`, `TASKMASTER_LOG_LEVEL`) are **no longer configured via environment variables**. Use the `task-master models` command (or `--setup` for interactive configuration) or the `models` MCP tool.
+**If AI commands FAIL in MCP** verify that the API key for the selected provider is present in the `env` section of `.roo/mcp.json`.
+**If AI commands FAIL in CLI** verify that the API key for the selected provider is present in the `.env` file in the root of the project.
+
+## Determining the Next Task
+
+- Run `next_task` / `task-master next` to show the next task to work on.
+- The command identifies tasks with all dependencies satisfied
+- Tasks are prioritized by priority level, dependency count, and ID
+- The command shows comprehensive task information including:
+    - Basic task details and description
+    - Implementation details
+    - Subtasks (if they exist)
+    - Contextual suggested actions
+- Recommended before starting any new development work
+- Respects your project's dependency structure
+- Ensures tasks are completed in the appropriate sequence
+- Provides ready-to-use commands for common task actions
+
+## Viewing Specific Task Details
+
+- Run `get_task` / `task-master show <id>` to view a specific task.
+- Use dot notation for subtasks: `task-master show 1.2` (shows subtask 2 of task 1)
+- Displays comprehensive information similar to the next command, but for a specific task
+- For parent tasks, shows all subtasks and their current status
+- For subtasks, shows parent task information and relationship
+- Provides contextual suggested actions appropriate for the specific task
+- Useful for examining task details before implementation or checking status
+
+## Managing Task Dependencies
+
+- Use `add_dependency` / `task-master add-dependency --id=<id> --depends-on=<id>` to add a dependency.
+- Use `remove_dependency` / `task-master remove-dependency --id=<id> --depends-on=<id>` to remove a dependency.
+- The system prevents circular dependencies and duplicate dependency entries
+- Dependencies are checked for existence before being added or removed
+- Task files are automatically regenerated after dependency changes
+- Dependencies are visualized with status indicators in task listings and files
+
+## Task Reorganization
+
+- Use `move_task` / `task-master move --from=<id> --to=<id>` to move tasks or subtasks within the hierarchy
+- This command supports several use cases:
+  - Moving a standalone task to become a subtask (e.g., `--from=5 --to=7`)
+  - Moving a subtask to become a standalone task (e.g., `--from=5.2 --to=7`) 
+  - Moving a subtask to a different parent (e.g., `--from=5.2 --to=7.3`)
+  - Reordering subtasks within the same parent (e.g., `--from=5.2 --to=5.4`)
+  - Moving a task to a new, non-existent ID position (e.g., `--from=5 --to=25`)
+  - Moving multiple tasks at once using comma-separated IDs (e.g., `--from=10,11,12 --to=16,17,18`)
+- The system includes validation to prevent data loss:
+  - Allows moving to non-existent IDs by creating placeholder tasks
+  - Prevents moving to existing task IDs that have content (to avoid overwriting)
+  - Validates source tasks exist before attempting to move them
+- The system maintains proper parent-child relationships and dependency integrity
+- Task files are automatically regenerated after the move operation
+- This provides greater flexibility in organizing and refining your task structure as project understanding evolves
+- This is especially useful when dealing with potential merge conflicts arising from teams creating tasks on separate branches. Solve these conflicts very easily by moving your tasks and keeping theirs.
+
+## Iterative Subtask Implementation
+
+Once a task has been broken down into subtasks using `expand_task` or similar methods, follow this iterative process for implementation:
+
+1.  **Understand the Goal (Preparation):**
+    *   Use `get_task` / `task-master show <subtaskId>` (see [`taskmaster.md`](mdc:.roo/rules/taskmaster.md)) to thoroughly understand the specific goals and requirements of the subtask.
+
+2.  **Initial Exploration & Planning (Iteration 1):**
+    *   This is the first attempt at creating a concrete implementation plan.
+    *   Explore the codebase to identify the precise files, functions, and even specific lines of code that will need modification.
+    *   Determine the intended code changes (diffs) and their locations.
+    *   Gather *all* relevant details from this exploration phase.
+
+3.  **Log the Plan:**
+    *   Run `update_subtask` / `task-master update-subtask --id=<subtaskId> --prompt='<detailed plan>'`.
+    *   Provide the *complete and detailed* findings from the exploration phase in the prompt. Include file paths, line numbers, proposed diffs, reasoning, and any potential challenges identified. Do not omit details. The goal is to create a rich, timestamped log within the subtask's `details`.
+
+4.  **Verify the Plan:**
+    *   Run `get_task` / `task-master show <subtaskId>` again to confirm that the detailed implementation plan has been successfully appended to the subtask's details.
+
+5.  **Begin Implementation:**
+    *   Set the subtask status using `set_task_status` / `task-master set-status --id=<subtaskId> --status=in-progress`.
+    *   Start coding based on the logged plan.
+
+6.  **Refine and Log Progress (Iteration 2+):**
+    *   As implementation progresses, you will encounter challenges, discover nuances, or confirm successful approaches.
+    *   **Before appending new information**: Briefly review the *existing* details logged in the subtask (using `get_task` or recalling from context) to ensure the update adds fresh insights and avoids redundancy.
+    *   **Regularly** use `update_subtask` / `task-master update-subtask --id=<subtaskId> --prompt='<update details>\n- What worked...\n- What didn't work...'` to append new findings.
+    *   **Crucially, log:**
+        *   What worked ("fundamental truths" discovered).
+        *   What didn't work and why (to avoid repeating mistakes).
+        *   Specific code snippets or configurations that were successful.
+        *   Decisions made, especially if confirmed with user input.
+        *   Any deviations from the initial plan and the reasoning.
+    *   The objective is to continuously enrich the subtask's details, creating a log of the implementation journey that helps the AI (and human developers) learn, adapt, and avoid repeating errors.
+
+7.  **Review & Update Rules (Post-Implementation):**
+    *   Once the implementation for the subtask is functionally complete, review all code changes and the relevant chat history.
+    *   Identify any new or modified code patterns, conventions, or best practices established during the implementation.
+    *   Create new or update existing rules following internal guidelines (previously linked to `cursor_rules.md` and `self_improve.md`).
+
+8.  **Mark Task Complete:**
+    *   After verifying the implementation and updating any necessary rules, mark the subtask as completed: `set_task_status` / `task-master set-status --id=<subtaskId> --status=done`.
+
+9.  **Commit Changes (If using Git):**
+    *   Stage the relevant code changes and any updated/new rule files (`git add .`).
+    *   Craft a comprehensive Git commit message summarizing the work done for the subtask, including both code implementation and any rule adjustments.
+    *   Execute the commit command directly in the terminal (e.g., `git commit -m 'feat(module): Implement feature X for subtask <subtaskId>\n\n- Details about changes...\n- Updated rule Y for pattern Z'`).
+    *   Consider if a Changeset is needed according to internal versioning guidelines (previously linked to `changeset.md`). If so, run `npm run changeset`, stage the generated file, and amend the commit or create a new one.
+
+10. **Proceed to Next Subtask:**
+    *   Identify the next subtask (e.g., using `next_task` / `task-master next`).
+
+## Code Analysis & Refactoring Techniques
+
+- **Top-Level Function Search**:
+    - Useful for understanding module structure or planning refactors.
+    - Use grep/ripgrep to find exported functions/constants:
+      `rg "export (async function|function|const) \w+"` or similar patterns.
+    - Can help compare functions between files during migrations or identify potential naming conflicts.
+
+---
+*This workflow provides a general guideline. Adapt it based on your specific project needs and team practices.*
