@@ -1,8 +1,0 @@
-{
-    "mcpServers": {
-        "mcp-debug": {
-            "command": "mcp-debug",
-            "args": ["--mcp-server", "--endpoint", "http://localhost:8090/sse"]
-        }
-    }
-} 
