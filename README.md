@@ -1,121 +1,138 @@
 # MCP-Debug
 
-A debugging tool for MCP (Model Context Protocol) servers. This tool acts as an MCP client that can connect to MCP servers via SSE (Server-Sent Events), inspect available tools, resources, and prompts, and execute them interactively.
+A debugging tool for MCP (Model Context Protocol) servers that provides an interactive client to inspect tools, resources, and prompts.
 
 ## Features
 
-- **Normal Mode**: Connect to an MCP server and monitor for changes
-- **REPL Mode**: Interactive interface to explore and execute MCP capabilities
-- **MCP Server Mode**: Run as an MCP server that exposes debugging functionality
+- Connect to MCP servers via SSE (Server-Sent Events)
+- List available tools, resources, and prompts
+- Execute tools interactively with JSON arguments
+- View resources and retrieve their contents
+- Execute prompts with arguments
+- Monitor server notifications in real-time
+- Full JSON-RPC message logging for debugging
+- Interactive REPL mode for exploration
+- MCP server mode for AI assistant integration
 
 ## Installation
 
+Clone the repository and build:
+
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/mcp-debug.git
+git clone <repository-url>
 cd mcp-debug
-
-# Build the binary
-make build
-
-# Install to $GOPATH/bin
-make install
+go build -o mcp-debug
 ```
 
 ## Usage
 
-### Normal Mode (Default)
-Connect to an MCP server and wait for notifications:
+### Basic Usage
+
+Connect to an MCP server and list available tools:
+
 ```bash
-mcp-debug agent --endpoint http://localhost:8080/sse
+mcp-debug --endpoint http://localhost:8090/sse
 ```
 
-### REPL Mode
-Interactive mode for exploring MCP capabilities:
+### Interactive REPL Mode
+
+For interactive exploration and tool execution:
+
 ```bash
-mcp-debug agent --repl
+mcp-debug --repl --endpoint http://localhost:8090/sse
 ```
 
-### MCP Server Mode
-Run as an MCP server (for integration with AI assistants):
-```bash
-mcp-debug agent --mcp-server
-```
+### Available REPL Commands
 
-## REPL Commands
-
-- `list tools` - List all available tools
-- `list resources` - List all available resources
-- `list prompts` - List all available prompts
-- `describe tool <name>` - Show detailed information about a tool
-- `describe resource <uri>` - Show detailed information about a resource
-- `describe prompt <name>` - Show detailed information about a prompt
-- `call <tool> {json}` - Execute a tool with JSON arguments
-- `get <resource-uri>` - Retrieve a resource
-- `prompt <name> {json}` - Get a prompt with JSON arguments
-- `notifications <on|off>` - Enable/disable notification display
-- `help` - Show help message
+In REPL mode, you can use these commands:
+- `help` - Show available commands
+- `list` - List all available tools, resources, and prompts
+- `tools` - List available tools
+- `tool <name>` - Get detailed information about a specific tool
+- `call <name> [args]` - Execute a tool with optional JSON arguments
+- `resources` - List available resources
+- `resource <uri>` - Get detailed information about a specific resource
+- `read <uri>` - Read the contents of a resource
+- `prompts` - List available prompts
+- `prompt <name>` - Get detailed information about a specific prompt
+- `complete <name> [args]` - Execute a prompt with optional JSON arguments
+- `notifications` - Toggle notification display
+- `verbose` - Toggle verbose logging
 - `exit` - Exit the REPL
 
-## Command Line Flags
+### Command Line Options
 
-- `--endpoint` - SSE endpoint URL (default: http://localhost:8080/sse)
+- `--endpoint` - SSE endpoint URL (default: http://localhost:8090/sse)
 - `--timeout` - Timeout for waiting for notifications (default: 5m)
-- `--verbose` - Enable verbose logging
+- `--verbose` - Enable verbose logging (show keepalive messages)
 - `--no-color` - Disable colored output
 - `--json-rpc` - Enable full JSON-RPC message logging
 - `--repl` - Start interactive REPL mode
 - `--mcp-server` - Run as MCP server (stdio transport)
 
-## Examples
+### MCP Server Mode
 
-### Testing a Tool
+To use mcp-debug as an MCP server (for integration with AI assistants):
+
 ```bash
-$ mcp-debug agent --repl
-MCP> list tools
-Available tools (3):
-  1. calculate              - Perform mathematical calculations
-  2. get_weather           - Get weather information
-  3. search               - Search for information
-
-MCP> call calculate {"operation": "add", "x": 5, "y": 3}
-Executing tool: calculate...
-Result:
-{
-  "result": 8
-}
+mcp-debug --mcp-server --endpoint http://localhost:8090/sse
 ```
 
-### Integration with Cursor
+This mode allows AI assistants to use mcp-debug as an MCP server that provides debugging capabilities for other MCP servers.
 
-Add to your `.cursor/mcp.json`:
+#### Cursor Integration
+
+Add this to your `.cursor/mcp.json`:
+
 ```json
 {
   "mcpServers": {
     "mcp-debug": {
       "command": "mcp-debug",
-      "args": ["agent", "--mcp-server", "--endpoint", "http://localhost:8080/sse"]
+      "args": ["--mcp-server", "--endpoint", "http://localhost:8090/sse"]
     }
   }
 }
 ```
 
+### Examples
+
+1. **Basic debugging session:**
+   ```bash
+   mcp-debug --endpoint http://localhost:8090/sse --verbose
+   ```
+
+2. **Interactive exploration:**
+   ```bash
+   mcp-debug --repl --endpoint http://localhost:8090/sse
+   ```
+
+3. **Full JSON-RPC logging:**
+   ```bash
+   mcp-debug --json-rpc --endpoint http://localhost:8090/sse
+   ```
+
+## Architecture
+
+The tool consists of several components:
+
+- **Client**: Connects to MCP servers via SSE and handles JSON-RPC communication
+- **REPL**: Interactive interface for exploring and executing MCP operations
+- **Logger**: Handles formatted output with color support and message filtering
+- **MCP Server**: Exposes REPL functionality as an MCP server for AI assistant integration
+
 ## Development
 
+Run tests:
 ```bash
-# Run tests
 make test
+```
 
-# Run in REPL mode
-make run
-
-# Run as MCP server
-make run-mcp
-
-# Run with verbose logging
-make run-verbose
+Build:
+```bash
+make build
 ```
 
 ## License
 
-MIT 
+[Add your license here] 

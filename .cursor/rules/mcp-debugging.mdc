@@ -14,13 +14,13 @@ The agent operates in three distinct modes:
 ### 1. Normal Mode (Default)
 Connects to an MCP server, lists available tools/resources/prompts, and waits for notifications:
 ```bash
-mcp-debug agent --endpoint http://localhost:8080/sse
+mcp-debug --endpoint http://localhost:8090/sse
 ```
 
 ### 2. REPL Mode
 Interactive mode for exploring and executing MCP capabilities:
 ```bash
-mcp-debug agent --repl
+mcp-debug --repl
 ```
 
 In REPL mode, you can:
@@ -34,7 +34,7 @@ In REPL mode, you can:
 ### 3. MCP Server Mode
 Run the agent as an MCP server exposing debugging tools via stdio:
 ```bash
-mcp-debug agent --mcp-server
+mcp-debug --mcp-server
 ```
 
 This mode is designed for integration with AI assistants like Claude or Cursor. Configure it in your AI assistant's MCP settings.
@@ -105,13 +105,13 @@ Content: Hello Alice! How can I help you today?
 ### 1. Connect and Explore
 Start with REPL mode to explore what the MCP server offers:
 ```bash
-mcp-debug agent --repl --endpoint http://your-server:port/sse
+mcp-debug --repl --endpoint http://your-server:port/sse
 ```
 
 ### 2. Enable Verbose Logging
 For detailed protocol inspection:
 ```bash
-mcp-debug agent --verbose --json-rpc
+mcp-debug --verbose --json-rpc
 ```
 
 ### 3. Test Tool Execution
@@ -152,7 +152,7 @@ To use mcp-debug as an MCP server in Cursor:
   "mcpServers": {
     "mcp-debug": {
       "command": "mcp-debug",
-      "args": ["agent", "--mcp-server", "--endpoint", "http://localhost:8080/sse"]
+      "args": ["--mcp-server", "--endpoint", "http://localhost:8090/sse"]
     }
   }
 }
