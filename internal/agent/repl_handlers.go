@@ -10,6 +10,11 @@ import (
 
 // handleCallTool executes a tool with the given arguments
 func (r *REPL) handleCallTool(ctx context.Context, toolName string, argsStr string) error {
+	// Check if server supports tools
+	if !r.client.ServerSupportsTools() {
+		return fmt.Errorf("server does not support tools capability")
+	}
+
 	// Find the tool to validate it exists
 	r.client.mu.RLock()
 	var tool *mcp.Tool
@@ -76,6 +81,11 @@ func (r *REPL) handleCallTool(ctx context.Context, toolName string, argsStr stri
 
 // handleGetResource retrieves and displays a resource
 func (r *REPL) handleGetResource(ctx context.Context, uri string) error {
+	// Check if server supports resources
+	if !r.client.ServerSupportsResources() {
+		return fmt.Errorf("server does not support resources capability")
+	}
+
 	// Find the resource to validate it exists
 	r.client.mu.RLock()
 	var resource *mcp.Resource
@@ -123,6 +133,11 @@ func (r *REPL) handleGetResource(ctx context.Context, uri string) error {
 
 // handleGetPrompt retrieves and displays a prompt with arguments
 func (r *REPL) handleGetPrompt(ctx context.Context, promptName string, argsStr string) error {
+	// Check if server supports prompts
+	if !r.client.ServerSupportsPrompts() {
+		return fmt.Errorf("server does not support prompts capability")
+	}
+
 	// Find the prompt to validate it exists
 	r.client.mu.RLock()
 	var prompt *mcp.Prompt
@@ -199,4 +214,4 @@ func (r *REPL) handleGetPrompt(ctx context.Context, promptName string, argsStr s
 	}
 
 	return nil
-} 
+}

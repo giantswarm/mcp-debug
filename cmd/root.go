@@ -13,14 +13,14 @@ import (
 )
 
 var (
-	version        string
-	endpoint       string
-	timeout        time.Duration
-	verbose        bool
-	noColor        bool
-	jsonRPC        bool
-	repl           bool
-	mcpServer      bool
+	version   string
+	endpoint  string
+	timeout   time.Duration
+	verbose   bool
+	noColor   bool
+	jsonRPC   bool
+	repl      bool
+	mcpServer bool
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -152,4 +152,4 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-} 
+}

@@ -64,17 +64,29 @@ func (r *REPL) Run(ctx context.Context) error {
 		return fmt.Errorf("initialization failed: %w", err)
 	}
 
-	// List tools, resources, and prompts initially
-	if err := r.client.listTools(ctx, true); err != nil {
-		return fmt.Errorf("initial tool listing failed: %w", err)
+	// List capabilities conditionally based on what the server supports
+	if r.client.ServerSupportsTools() {
+		if err := r.client.listTools(ctx, true); err != nil {
+			return fmt.Errorf("initial tool listing failed: %w", err)
+		}
+	} else {
+		r.logger.Info("Server does not support tools capability")
 	}
 
-	if err := r.client.listResources(ctx, true); err != nil {
-		return fmt.Errorf("initial resource listing failed: %w", err)
+	if r.client.ServerSupportsResources() {
+		if err := r.client.listResources(ctx, true); err != nil {
+			return fmt.Errorf("initial resource listing failed: %w", err)
+		}
+	} else {
+		r.logger.Info("Server does not support resources capability")
 	}
 
-	if err := r.client.listPrompts(ctx, true); err != nil {
-		return fmt.Errorf("initial prompt listing failed: %w", err)
+	if r.client.ServerSupportsPrompts() {
+		if err := r.client.listPrompts(ctx, true); err != nil {
+			return fmt.Errorf("initial prompt listing failed: %w", err)
+		}
+	} else {
+		r.logger.Info("Server does not support prompts capability")
 	}
 
 	// Set up readline with tab completion
@@ -158,19 +170,29 @@ func (r *REPL) Run(ctx context.Context) error {
 func (r *REPL) createCompleter() *readline.PrefixCompleter {
 	// Get lists for completion
 	r.client.mu.RLock()
-	tools := make([]string, len(r.client.toolCache))
-	for i, tool := range r.client.toolCache {
-		tools[i] = tool.Name
+	var tools []string
+	var resources []string
+	var prompts []string
+
+	if r.client.ServerSupportsTools() {
+		tools = make([]string, len(r.client.toolCache))
+		for i, tool := range r.client.toolCache {
+			tools[i] = tool.Name
+		}
 	}
 
-	resources := make([]string, len(r.client.resourceCache))
-	for i, resource := range r.client.resourceCache {
-		resources[i] = resource.URI
+	if r.client.ServerSupportsResources() {
+		resources = make([]string, len(r.client.resourceCache))
+		for i, resource := range r.client.resourceCache {
+			resources[i] = resource.URI
+		}
 	}
 
-	prompts := make([]string, len(r.client.promptCache))
-	for i, prompt := range r.client.promptCache {
-		prompts[i] = prompt.Name
+	if r.client.ServerSupportsPrompts() {
+		prompts = make([]string, len(r.client.promptCache))
+		for i, prompt := range r.client.promptCache {
+			prompts[i] = prompt.Name
+		}
 	}
 	r.client.mu.RUnlock()
 
@@ -190,29 +212,63 @@ func (r *REPL) createCompleter() *readline.PrefixCompleter {
 		promptCompleter[i] = readline.PcItem(prompt)
 	}
 
-	return readline.NewPrefixCompleter(
+	// Build list items based on supported capabilities
+	var listItems []readline.PrefixCompleterInterface
+	if r.client.ServerSupportsTools() {
+		listItems = append(listItems, readline.PcItem("tools"))
+	}
+	if r.client.ServerSupportsResources() {
+		listItems = append(listItems, readline.PcItem("resources"))
+	}
+	if r.client.ServerSupportsPrompts() {
+		listItems = append(listItems, readline.PcItem("prompts"))
+	}
+
+	// Build describe items based on supported capabilities
+	var describeItems []readline.PrefixCompleterInterface
+	if r.client.ServerSupportsTools() {
+		describeItems = append(describeItems, readline.PcItem("tool", toolCompleter...))
+	}
+	if r.client.ServerSupportsResources() {
+		describeItems = append(describeItems, readline.PcItem("resource", resourceCompleter...))
+	}
+	if r.client.ServerSupportsPrompts() {
+		describeItems = append(describeItems, readline.PcItem("prompt", promptCompleter...))
+	}
+
+	// Build top-level items
+	items := []readline.PrefixCompleterInterface{
 		readline.PcItem("help"),
 		readline.PcItem("?"),
 		readline.PcItem("exit"),
 		readline.PcItem("quit"),
-		readline.PcItem("list",
-			readline.PcItem("tools"),
-			readline.PcItem("resources"),
-			readline.PcItem("prompts"),
-		),
-		readline.PcItem("describe",
-			readline.PcItem("tool", toolCompleter...),
-			readline.PcItem("resource", resourceCompleter...),
-			readline.PcItem("prompt", promptCompleter...),
-		),
-		readline.PcItem("call", toolCompleter...),
-		readline.PcItem("get", resourceCompleter...),
-		readline.PcItem("prompt", promptCompleter...),
 		readline.PcItem("notifications",
 			readline.PcItem("on"),
 			readline.PcItem("off"),
 		),
-	)
+	}
+
+	if len(listItems) > 0 {
+		items = append(items, readline.PcItem("list", listItems...))
+	}
+
+	if len(describeItems) > 0 {
+		items = append(items, readline.PcItem("describe", describeItems...))
+	}
+
+	if r.client.ServerSupportsTools() {
+		items = append(items, readline.PcItem("call", toolCompleter...))
+	}
+
+	if r.client.ServerSupportsResources() {
+		items = append(items, readline.PcItem("get", resourceCompleter...))
+	}
+
+	if r.client.ServerSupportsPrompts() {
+		items = append(items, readline.PcItem("prompt", promptCompleter...))
+	}
+
+	return readline.NewPrefixCompleter(items...)
 }
 
 // filterInput filters input characters for readline
@@ -355,10 +411,22 @@ func (r *REPL) showHelp() error {
 func (r *REPL) handleList(ctx context.Context, target string) error {
 	switch strings.ToLower(target) {
 	case "tools", "tool":
+		if !r.client.ServerSupportsTools() {
+			fmt.Println("Server does not support tools capability.")
+			return nil
+		}
 		return r.listTools(ctx)
 	case "resources", "resource":
+		if !r.client.ServerSupportsResources() {
+			fmt.Println("Server does not support resources capability.")
+			return nil
+		}
 		return r.listResources(ctx)
 	case "prompts", "prompt":
+		if !r.client.ServerSupportsPrompts() {
+			fmt.Println("Server does not support prompts capability.")
+			return nil
+		}
 		return r.listPrompts(ctx)
 	default:
 		return fmt.Errorf("unknown list target: %s. Use 'tools', 'resources', or 'prompts'", target)
@@ -427,10 +495,19 @@ func (r *REPL) listPrompts(ctx context.Context) error {
 func (r *REPL) handleDescribe(ctx context.Context, targetType, name string) error {
 	switch strings.ToLower(targetType) {
 	case "tool":
+		if !r.client.ServerSupportsTools() {
+			return fmt.Errorf("server does not support tools capability")
+		}
 		return r.describeTool(ctx, name)
 	case "resource":
+		if !r.client.ServerSupportsResources() {
+			return fmt.Errorf("server does not support resources capability")
+		}
 		return r.describeResource(ctx, name)
 	case "prompt":
+		if !r.client.ServerSupportsPrompts() {
+			return fmt.Errorf("server does not support prompts capability")
+		}
 		return r.describePrompt(ctx, name)
 	default:
 		return fmt.Errorf("unknown describe target: %s. Use 'tool', 'resource', or 'prompt'", targetType)
@@ -516,4 +593,4 @@ func (r *REPL) handleNotifications(setting string) error {
 		return fmt.Errorf("invalid setting: %s. Use 'on' or 'off'", setting)
 	}
 	return nil
-} 
+}

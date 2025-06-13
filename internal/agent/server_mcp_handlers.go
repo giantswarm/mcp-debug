@@ -262,4 +262,4 @@ func (m *MCPServer) handleGetPrompt(ctx context.Context, request mcp.CallToolReq
 	}
 
 	return mcp.NewToolResultText(string(data)), nil
-} 
+}
