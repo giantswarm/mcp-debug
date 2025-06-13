@@ -177,4 +177,4 @@ func (m *MCPServer) registerTools() {
 		),
 	)
 	m.mcpServer.AddTool(getPromptTool, m.handleGetPrompt)
-} 
+}

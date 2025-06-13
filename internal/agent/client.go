@@ -12,13 +12,14 @@ import (
 
 // Client represents an MCP agent client
 type Client struct {
-	endpoint      string
-	logger        *Logger
-	client        client.MCPClient
-	toolCache     []mcp.Tool
-	resourceCache []mcp.Resource
-	promptCache   []mcp.Prompt
-	mu            sync.RWMutex
+	endpoint           string
+	logger             *Logger
+	client             client.MCPClient
+	toolCache          []mcp.Tool
+	resourceCache      []mcp.Resource
+	promptCache        []mcp.Prompt
+	mu                 sync.RWMutex
+	serverCapabilities *mcp.ServerCapabilities
 }
 
 // NewClient creates a new agent client
@@ -63,19 +64,29 @@ func (c *Client) Run(ctx context.Context) error {
 		return fmt.Errorf("initialization failed: %w", err)
 	}
 
-	// List tools initially
-	if err := c.listTools(ctx, true); err != nil {
-		return fmt.Errorf("initial tool listing failed: %w", err)
+	// List capabilities conditionally based on what the server supports
+	if c.ServerSupportsTools() {
+		if err := c.listTools(ctx, true); err != nil {
+			return fmt.Errorf("initial tool listing failed: %w", err)
+		}
+	} else {
+		c.logger.Info("Server does not support tools capability")
 	}
 
-	// List resources initially
-	if err := c.listResources(ctx, true); err != nil {
-		return fmt.Errorf("initial resource listing failed: %w", err)
+	if c.ServerSupportsResources() {
+		if err := c.listResources(ctx, true); err != nil {
+			return fmt.Errorf("initial resource listing failed: %w", err)
+		}
+	} else {
+		c.logger.Info("Server does not support resources capability")
 	}
 
-	// List prompts initially
-	if err := c.listPrompts(ctx, true); err != nil {
-		return fmt.Errorf("initial prompt listing failed: %w", err)
+	if c.ServerSupportsPrompts() {
+		if err := c.listPrompts(ctx, true); err != nil {
+			return fmt.Errorf("initial prompt listing failed: %w", err)
+		}
+	} else {
+		c.logger.Info("Server does not support prompts capability")
 	}
 
 	// Wait for notifications
@@ -124,6 +135,11 @@ func (c *Client) initialize(ctx context.Context) error {
 
 	// Log response
 	c.logger.Response("initialize", result)
+
+	// Store server capabilities for conditional feature usage
+	c.mu.Lock()
+	c.serverCapabilities = &result.Capabilities
+	c.mu.Unlock()
 
 	return nil
 }
@@ -247,16 +263,22 @@ func (c *Client) handleNotification(ctx context.Context, notification mcp.JSONRP
 	// Log the notification
 	c.logger.Notification(notification.Method, notification.Params)
 
-	// Handle specific notifications
+	// Handle specific notifications only if the server supports the corresponding capability
 	switch notification.Method {
 	case "notifications/tools/list_changed":
-		return c.listTools(ctx, false)
+		if c.ServerSupportsTools() {
+			return c.listTools(ctx, false)
+		}
 
 	case "notifications/resources/list_changed":
-		return c.listResources(ctx, false)
+		if c.ServerSupportsResources() {
+			return c.listResources(ctx, false)
+		}
 
 	case "notifications/prompts/list_changed":
-		return c.listPrompts(ctx, false)
+		if c.ServerSupportsPrompts() {
+			return c.listPrompts(ctx, false)
+		}
 
 	default:
 		// Unknown notification type
@@ -433,4 +455,23 @@ func PrettyJSON(v interface{}) string {
 // prettyJSON is a wrapper for backward compatibility
 func prettyJSON(v interface{}) string {
 	return PrettyJSON(v)
-} 
+}
+
+// Helper methods to check server capabilities
+func (c *Client) ServerSupportsTools() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.serverCapabilities != nil && c.serverCapabilities.Tools != nil
+}
+
+func (c *Client) ServerSupportsResources() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.serverCapabilities != nil && c.serverCapabilities.Resources != nil
+}
+
+func (c *Client) ServerSupportsPrompts() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.serverCapabilities != nil && c.serverCapabilities.Prompts != nil
+}

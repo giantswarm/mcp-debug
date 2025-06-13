@@ -354,4 +354,4 @@ func (l *Logger) countPrompts(result interface{}) int {
 	}
 
 	return -1 // Indicate we couldn't count
-} 
+}

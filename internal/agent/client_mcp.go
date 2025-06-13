@@ -78,4 +78,4 @@ func (c *Client) GetPrompt(ctx context.Context, name string, args map[string]str
 	c.logger.Response("prompts/get", result)
 
 	return result, nil
-} 
+}
