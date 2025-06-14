@@ -14,17 +14,17 @@ import (
 )
 
 var (
-	version   string
-	endpoint  string
-	timeout   time.Duration
-	verbose   bool
-	noColor   bool
-	jsonRPC   bool
-	repl      bool
-	mcpServer bool
-	transport string
+	version         string
+	endpoint        string
+	timeout         time.Duration
+	verbose         bool
+	noColor         bool
+	jsonRPC         bool
+	repl            bool
+	mcpServer       bool
+	transport       string
 	serverTransport string
-	listenAddr string
+	listenAddr      string
 )
 
 // rootCmd represents the base command when called without any subcommands
