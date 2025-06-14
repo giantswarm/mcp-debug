@@ -49,7 +49,10 @@ func (m *MCPServer) Start(ctx context.Context, listenAddr string) error {
 	case "stdio":
 		return server.ServeStdio(m.mcpServer)
 	case "streamable-http":
-		httpServer := server.NewStreamableHTTPServer(m.mcpServer)
+		httpServer := server.NewStreamableHTTPServer(
+			m.mcpServer,
+			server.WithEndpointPath("/mcp"),
+		)
 		return httpServer.Start(listenAddr)
 	default:
 		return fmt.Errorf("unsupported server transport: %s", m.serverTransport)

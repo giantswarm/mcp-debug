@@ -62,7 +62,7 @@ In MCP Server mode:
 - It's designed for integration with AI assistants like Claude or Cursor
 - Configure it in your AI assistant's MCP settings
 
-By default, it connects to http://localhost:8090/sse. You can override this with the --endpoint flag.`,
+By default, it connects to http://localhost:8899/mcp. You can override this with the --endpoint flag.`,
 	RunE: runMCPDebug,
 }
 
@@ -82,10 +82,10 @@ func SetVersion(v string) {
 
 func init() {
 	// Add flags
-	rootCmd.Flags().StringVar(&endpoint, "endpoint", "http://localhost:8090", "MCP endpoint URL")
+	rootCmd.Flags().StringVar(&endpoint, "endpoint", "http://localhost:8899/mcp", "MCP endpoint URL (must end with /mcp for streamable-http)")
 	rootCmd.Flags().StringVar(&transport, "transport", "streamable-http", "Transport protocol to use for client connections (streamable-http, sse)")
 	rootCmd.Flags().StringVar(&serverTransport, "server-transport", "stdio", "Transport protocol for the MCP server itself (stdio, streamable-http)")
-	rootCmd.Flags().StringVar(&listenAddr, "listen-addr", ":8091", "Listen address for streamable-http server")
+	rootCmd.Flags().StringVar(&listenAddr, "listen-addr", ":8899", "Listen address for streamable-http server (path is fixed to /mcp)")
 	rootCmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Timeout for waiting for notifications")
 	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "Enable verbose logging (show keepalive messages)")
 	rootCmd.Flags().BoolVar(&noColor, "no-color", false, "Disable colored output")
@@ -102,8 +102,15 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 	isSSEEndpoint := strings.HasSuffix(endpoint, "/sse")
 	isSSETransport := transport == "sse"
 
+	isStreamableHTTPEndpoint := strings.HasSuffix(endpoint, "/mcp")
+	isStreamableHTTPTransport := transport == "streamable-http"
+
 	if isSSETransport && !isSSEEndpoint {
 		return fmt.Errorf("transport is 'sse' but endpoint '%s' does not end with /sse", endpoint)
+	}
+
+	if isStreamableHTTPTransport && !isStreamableHTTPEndpoint {
+		return fmt.Errorf("transport is 'streamable-http' but endpoint '%s' does not end with /mcp", endpoint)
 	}
 
 	if isSSEEndpoint && !isSSETransport {
@@ -143,7 +150,11 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 
 		logger.Info("Starting mcp-debug MCP server (transport: %s)...", serverTransport)
 		if serverTransport == "streamable-http" {
-			logger.Info("Listening on %s", listenAddr)
+			addr := listenAddr
+			if !strings.Contains(addr, ":") {
+				addr = ":" + addr
+			}
+			logger.Info("Listening on %s%s", addr, "/mcp")
 		}
 
 		if err := server.Start(ctx, listenAddr); err != nil {
