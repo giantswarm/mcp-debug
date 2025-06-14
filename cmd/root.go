@@ -6,6 +6,7 @@ import (
 	"mcp-debug/internal/agent"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -13,14 +14,17 @@ import (
 )
 
 var (
-	version   string
-	endpoint  string
-	timeout   time.Duration
-	verbose   bool
-	noColor   bool
-	jsonRPC   bool
-	repl      bool
-	mcpServer bool
+	version         string
+	endpoint        string
+	timeout         time.Duration
+	verbose         bool
+	noColor         bool
+	jsonRPC         bool
+	repl            bool
+	mcpServer       bool
+	transport       string
+	serverTransport string
+	listenAddr      string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -58,7 +62,7 @@ In MCP Server mode:
 - It's designed for integration with AI assistants like Claude or Cursor
 - Configure it in your AI assistant's MCP settings
 
-By default, it connects to http://localhost:8090/sse. You can override this with the --endpoint flag.`,
+By default, it connects to http://localhost:8899/mcp. You can override this with the --endpoint flag.`,
 	RunE: runMCPDebug,
 }
 
@@ -78,7 +82,10 @@ func SetVersion(v string) {
 
 func init() {
 	// Add flags
-	rootCmd.Flags().StringVar(&endpoint, "endpoint", "http://localhost:8090/sse", "SSE endpoint URL")
+	rootCmd.Flags().StringVar(&endpoint, "endpoint", "http://localhost:8899/mcp", "MCP endpoint URL (must end with /mcp for streamable-http)")
+	rootCmd.Flags().StringVar(&transport, "transport", "streamable-http", "Transport protocol to use for client connections (streamable-http, sse)")
+	rootCmd.Flags().StringVar(&serverTransport, "server-transport", "stdio", "Transport protocol for the MCP server itself (stdio, streamable-http)")
+	rootCmd.Flags().StringVar(&listenAddr, "listen-addr", ":8899", "Listen address for streamable-http server (path is fixed to /mcp)")
 	rootCmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Timeout for waiting for notifications")
 	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "Enable verbose logging (show keepalive messages)")
 	rootCmd.Flags().BoolVar(&noColor, "no-color", false, "Disable colored output")
@@ -91,6 +98,25 @@ func init() {
 }
 
 func runMCPDebug(cmd *cobra.Command, args []string) error {
+	// Validate transport and endpoint combination
+	isSSEEndpoint := strings.HasSuffix(endpoint, "/sse")
+	isSSETransport := transport == "sse"
+
+	isStreamableHTTPEndpoint := strings.HasSuffix(endpoint, "/mcp")
+	isStreamableHTTPTransport := transport == "streamable-http"
+
+	if isSSETransport && !isSSEEndpoint {
+		return fmt.Errorf("transport is 'sse' but endpoint '%s' does not end with /sse", endpoint)
+	}
+
+	if isStreamableHTTPTransport && !isStreamableHTTPEndpoint {
+		return fmt.Errorf("transport is 'streamable-http' but endpoint '%s' does not end with /mcp", endpoint)
+	}
+
+	if isSSEEndpoint && !isSSETransport {
+		return fmt.Errorf("endpoint '%s' looks like an SSE endpoint, but transport is '%s'. Please use --transport=sse", endpoint, transport)
+	}
+
 	// Create context with signal handling
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
@@ -109,24 +135,33 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 	// Create logger
 	logger := agent.NewLogger(verbose, !noColor, jsonRPC)
 
+	// Create and run agent client
+	client := agent.NewClient(endpoint, transport, logger)
+	if err := client.Run(ctx); err != nil {
+		return fmt.Errorf("failed to connect client: %w", err)
+	}
+
 	// Run in MCP Server mode if requested
 	if mcpServer {
-		server, err := agent.NewMCPServer(endpoint, logger, false)
+		server, err := agent.NewMCPServer(client, serverTransport, logger, false)
 		if err != nil {
 			return fmt.Errorf("failed to create MCP server: %w", err)
 		}
 
-		logger.Info("Starting mcp-debug MCP server (stdio transport)...")
-		logger.Info("Connecting to MCP server at: %s", endpoint)
+		logger.Info("Starting mcp-debug MCP server (transport: %s)...", serverTransport)
+		if serverTransport == "streamable-http" {
+			addr := listenAddr
+			if !strings.Contains(addr, ":") {
+				addr = ":" + addr
+			}
+			logger.Info("Listening on %s%s", addr, "/mcp")
+		}
 
-		if err := server.Start(ctx); err != nil {
+		if err := server.Start(ctx, listenAddr); err != nil {
 			return fmt.Errorf("MCP server error: %w", err)
 		}
 		return nil
 	}
-
-	// Create and run agent client
-	client := agent.NewClient(endpoint, logger)
 
 	// Run in REPL mode if requested
 	if repl {
@@ -143,7 +178,7 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 	defer timeoutCancel()
 
 	// Run the agent in normal mode
-	if err := client.Run(timeoutCtx); err != nil {
+	if err := client.Listen(timeoutCtx); err != nil {
 		if err == context.DeadlineExceeded {
 			logger.Info("Timeout reached after %v", timeout)
 			return nil

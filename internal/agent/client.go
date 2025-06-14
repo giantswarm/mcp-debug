@@ -3,7 +3,10 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
+	"strings"
 	"sync"
 
 	"github.com/mark3labs/mcp-go/client"
@@ -13,48 +16,74 @@ import (
 // Client represents an MCP agent client
 type Client struct {
 	endpoint           string
+	transport          string
 	logger             *Logger
 	client             client.MCPClient
 	toolCache          []mcp.Tool
 	resourceCache      []mcp.Resource
 	promptCache        []mcp.Prompt
 	mu                 sync.RWMutex
+	notificationChan   chan mcp.JSONRPCNotification
 	serverCapabilities *mcp.ServerCapabilities
 }
 
 // NewClient creates a new agent client
-func NewClient(endpoint string, logger *Logger) *Client {
+func NewClient(endpoint, transport string, logger *Logger) *Client {
 	return &Client{
-		endpoint:      endpoint,
-		logger:        logger,
-		toolCache:     []mcp.Tool{},
-		resourceCache: []mcp.Resource{},
-		promptCache:   []mcp.Prompt{},
+		endpoint:         endpoint,
+		transport:        transport,
+		logger:           logger,
+		toolCache:        []mcp.Tool{},
+		resourceCache:    []mcp.Resource{},
+		promptCache:      []mcp.Prompt{},
+		notificationChan: make(chan mcp.JSONRPCNotification, 10),
 	}
 }
 
 // Run executes the agent workflow
 func (c *Client) Run(ctx context.Context) error {
-	c.logger.Info("Connecting to MCP server at %s...", c.endpoint)
+	return c.connectAndInitialize(ctx)
+}
 
-	// Create SSE client
-	sseClient, err := client.NewSSEMCPClient(c.endpoint)
-	if err != nil {
-		return fmt.Errorf("failed to create SSE client: %w", err)
+func (c *Client) Reconnect(ctx context.Context) error {
+	c.logger.Info("Attempting to reconnect to MCP server...")
+	if c.client != nil {
+		c.client.Close()
 	}
-	c.client = sseClient
+	return c.connectAndInitialize(ctx)
+}
 
-	// Start the SSE transport
-	if err := sseClient.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start SSE client: %w", err)
+func (c *Client) connectAndInitialize(ctx context.Context) error {
+	c.logger.Info("Connecting to MCP server at %s using %s transport...", c.endpoint, c.transport)
+
+	var mcpClient *client.Client
+	var err error
+
+	switch c.transport {
+	case "sse":
+		mcpClient, err = client.NewSSEMCPClient(c.endpoint)
+		if err != nil {
+			return fmt.Errorf("failed to create SSE client: %w", err)
+		}
+	case "streamable-http":
+		mcpClient, err = client.NewStreamableHttpClient(c.endpoint)
+		if err != nil {
+			return fmt.Errorf("failed to create streamable HTTP client: %w", err)
+		}
+	default:
+		return fmt.Errorf("unsupported transport: %s", c.transport)
 	}
-	defer sseClient.Close()
+	c.client = mcpClient
+
+	// Start the transport
+	if err := mcpClient.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start client: %w", err)
+	}
 
 	// Set up notification handler
-	notificationChan := make(chan mcp.JSONRPCNotification, 10)
-	sseClient.OnNotification(func(notification mcp.JSONRPCNotification) {
+	mcpClient.OnNotification(func(notification mcp.JSONRPCNotification) {
 		select {
-		case notificationChan <- notification:
+		case c.notificationChan <- notification:
 		case <-ctx.Done():
 		}
 	})
@@ -89,6 +118,10 @@ func (c *Client) Run(ctx context.Context) error {
 		c.logger.Info("Server does not support prompts capability")
 	}
 
+	return nil
+}
+
+func (c *Client) Listen(ctx context.Context) error {
 	// Wait for notifications
 	c.logger.Info("Waiting for notifications (press Ctrl+C to exit)...")
 
@@ -98,7 +131,7 @@ func (c *Client) Run(ctx context.Context) error {
 			c.logger.Info("Shutting down...")
 			return nil
 
-		case notification := <-notificationChan:
+		case notification := <-c.notificationChan:
 			if err := c.handleNotification(ctx, notification); err != nil {
 				c.logger.Error("Failed to handle notification: %v", err)
 			}
@@ -474,4 +507,31 @@ func (c *Client) ServerSupportsPrompts() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.serverCapabilities != nil && c.serverCapabilities.Prompts != nil
+}
+
+func shouldReconnect(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check for context cancellation, which can happen on disconnect
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+
+	errMsg := strings.ToLower(err.Error())
+	if strings.Contains(errMsg, "connection refused") ||
+		strings.Contains(errMsg, "connection reset by peer") ||
+		strings.Contains(errMsg, "transport is closing") ||
+		strings.Contains(errMsg, "broken pipe") ||
+		strings.Contains(errMsg, "unexpected eof") {
+		return true
+	}
+
+	return false
 }

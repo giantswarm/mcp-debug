@@ -6,7 +6,7 @@ import (
 
 func TestServerCapabilityChecking(t *testing.T) {
 	logger := NewLogger(false, false, false)
-	client := NewClient("test://endpoint", logger)
+	client := NewClient("test://endpoint", "streamable-http", logger)
 
 	// Test with no capabilities set (should all return false)
 	if client.ServerSupportsTools() {
@@ -24,5 +24,14 @@ func TestServerCapabilityChecking(t *testing.T) {
 	// but we can verify the methods work correctly when no capabilities are set
 	if client.serverCapabilities != nil {
 		t.Error("Expected serverCapabilities to be nil initially")
+	}
+}
+
+func TestNewClient(t *testing.T) {
+	logger := NewLogger(false, false, false)
+	client := NewClient("http://localhost:8080", "streamable-http", logger)
+
+	if client == nil {
+		t.Error("Expected client to be created, but got nil")
 	}
 }

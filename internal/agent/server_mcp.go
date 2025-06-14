@@ -4,23 +4,21 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // MCPServer wraps the agent functionality and exposes it via MCP
 type MCPServer struct {
-	client        *Client
-	logger        *Logger
-	mcpServer     *server.MCPServer
-	notifyClients bool
+	client          *Client
+	logger          *Logger
+	mcpServer       *server.MCPServer
+	notifyClients   bool
+	serverTransport string
 }
 
 // NewMCPServer creates a new MCP server that exposes agent functionality
-func NewMCPServer(endpoint string, logger *Logger, notifyClients bool) (*MCPServer, error) {
-	client := NewClient(endpoint, logger)
-
+func NewMCPServer(client *Client, serverTransport string, logger *Logger, notifyClients bool) (*MCPServer, error) {
 	// Create MCP server
 	mcpServer := server.NewMCPServer(
 		"mcp-debug-agent",
@@ -31,10 +29,11 @@ func NewMCPServer(endpoint string, logger *Logger, notifyClients bool) (*MCPServ
 	)
 
 	ms := &MCPServer{
-		client:        client,
-		logger:        logger,
-		mcpServer:     mcpServer,
-		notifyClients: notifyClients,
+		client:          client,
+		logger:          logger,
+		mcpServer:       mcpServer,
+		notifyClients:   notifyClients,
+		serverTransport: serverTransport,
 	}
 
 	// Register all tools
@@ -43,53 +42,21 @@ func NewMCPServer(endpoint string, logger *Logger, notifyClients bool) (*MCPServ
 	return ms, nil
 }
 
-// Start starts the MCP server using stdio transport
-func (m *MCPServer) Start(ctx context.Context) error {
-	// Connect to server first
-	if err := m.connectToServer(ctx); err != nil {
-		return fmt.Errorf("failed to connect to server: %w", err)
+// Start starts the MCP server using stdio or streamable-http transport
+func (m *MCPServer) Start(ctx context.Context, listenAddr string) error {
+	// Start the server with the specified transport
+	switch m.serverTransport {
+	case "stdio":
+		return server.ServeStdio(m.mcpServer)
+	case "streamable-http":
+		httpServer := server.NewStreamableHTTPServer(
+			m.mcpServer,
+			server.WithEndpointPath("/mcp"),
+		)
+		return httpServer.Start(listenAddr)
+	default:
+		return fmt.Errorf("unsupported server transport: %s", m.serverTransport)
 	}
-
-	// Start the stdio server
-	return server.ServeStdio(m.mcpServer)
-}
-
-// connectToServer establishes connection to the MCP server
-func (m *MCPServer) connectToServer(ctx context.Context) error {
-	m.logger.Info("Connecting to MCP server at %s...", m.client.endpoint)
-
-	// Create SSE client
-	sseClient, err := client.NewSSEMCPClient(m.client.endpoint)
-	if err != nil {
-		return fmt.Errorf("failed to create SSE client: %w", err)
-	}
-	m.client.client = sseClient
-
-	// Start the SSE transport
-	if err := sseClient.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start SSE client: %w", err)
-	}
-
-	// Initialize the session
-	if err := m.client.initialize(ctx); err != nil {
-		sseClient.Close()
-		return fmt.Errorf("initialization failed: %w", err)
-	}
-
-	// List initial items
-	if err := m.client.listTools(ctx, true); err != nil {
-		m.logger.Error("Failed to list tools: %v", err)
-	}
-
-	if err := m.client.listResources(ctx, true); err != nil {
-		m.logger.Error("Failed to list resources: %v", err)
-	}
-
-	if err := m.client.listPrompts(ctx, true); err != nil {
-		m.logger.Error("Failed to list prompts: %v", err)
-	}
-
-	return nil
 }
 
 // registerTools registers all MCP tools
