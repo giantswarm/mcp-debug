@@ -93,6 +93,9 @@ func init() {
 	rootCmd.Flags().BoolVar(&repl, "repl", false, "Start interactive REPL mode")
 	rootCmd.Flags().BoolVar(&mcpServer, "mcp-server", false, "Run as MCP server (stdio transport)")
 
+	// Add subcommands
+	rootCmd.AddCommand(newSelfUpdateCmd())
+
 	// Mark flags as mutually exclusive
 	rootCmd.MarkFlagsMutuallyExclusive("repl", "mcp-server")
 }
