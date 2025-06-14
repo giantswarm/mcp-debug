@@ -10,85 +10,28 @@ import (
 	"sync"
 
 	"github.com/chzyer/readline"
-	"github.com/mark3labs/mcp-go/client"
-	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // REPL represents the Read-Eval-Print Loop for MCP interaction
 type REPL struct {
-	client           *Client
-	logger           *Logger
-	rl               *readline.Instance
-	notificationChan chan mcp.JSONRPCNotification
-	stopChan         chan struct{}
-	wg               sync.WaitGroup
+	client   *Client
+	logger   *Logger
+	rl       *readline.Instance
+	stopChan chan struct{}
+	wg       sync.WaitGroup
 }
 
 // NewREPL creates a new REPL instance
 func NewREPL(client *Client, logger *Logger) *REPL {
 	return &REPL{
-		client:           client,
-		logger:           logger,
-		notificationChan: make(chan mcp.JSONRPCNotification, 10),
-		stopChan:         make(chan struct{}),
+		client:   client,
+		logger:   logger,
+		stopChan: make(chan struct{}),
 	}
 }
 
 // Run starts the REPL
 func (r *REPL) Run(ctx context.Context) error {
-	r.logger.Info("Connecting to MCP server at %s...", r.client.endpoint)
-
-	// Create SSE client
-	sseClient, err := client.NewSSEMCPClient(r.client.endpoint)
-	if err != nil {
-		return fmt.Errorf("failed to create SSE client: %w", err)
-	}
-	r.client.client = sseClient
-
-	// Start the SSE transport
-	if err := sseClient.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start SSE client: %w", err)
-	}
-	defer sseClient.Close()
-
-	// Set up notification handler
-	sseClient.OnNotification(func(notification mcp.JSONRPCNotification) {
-		select {
-		case r.notificationChan <- notification:
-		case <-ctx.Done():
-		}
-	})
-
-	// Initialize the session
-	if err := r.client.initialize(ctx); err != nil {
-		return fmt.Errorf("initialization failed: %w", err)
-	}
-
-	// List capabilities conditionally based on what the server supports
-	if r.client.ServerSupportsTools() {
-		if err := r.client.listTools(ctx, true); err != nil {
-			return fmt.Errorf("initial tool listing failed: %w", err)
-		}
-	} else {
-		r.logger.Info("Server does not support tools capability")
-	}
-
-	if r.client.ServerSupportsResources() {
-		if err := r.client.listResources(ctx, true); err != nil {
-			return fmt.Errorf("initial resource listing failed: %w", err)
-		}
-	} else {
-		r.logger.Info("Server does not support resources capability")
-	}
-
-	if r.client.ServerSupportsPrompts() {
-		if err := r.client.listPrompts(ctx, true); err != nil {
-			return fmt.Errorf("initial prompt listing failed: %w", err)
-		}
-	} else {
-		r.logger.Info("Server does not support prompts capability")
-	}
-
 	// Set up readline with tab completion
 	completer := r.createCompleter()
 	historyFile := filepath.Join(os.TempDir(), ".mcp_debug_history")
@@ -291,7 +234,7 @@ func (r *REPL) notificationListener(ctx context.Context) {
 			return
 		case <-r.stopChan:
 			return
-		case notification := <-r.notificationChan:
+		case notification := <-r.client.notificationChan:
 			// Temporarily pause readline
 			if r.rl != nil {
 				r.rl.Stdout().Write([]byte("\r\033[K"))

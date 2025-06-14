@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -45,11 +44,6 @@ func NewMCPServer(client *Client, serverTransport string, logger *Logger, notify
 
 // Start starts the MCP server using stdio or streamable-http transport
 func (m *MCPServer) Start(ctx context.Context, listenAddr string) error {
-	// Connect to server first
-	if err := m.connectToServer(ctx); err != nil {
-		return fmt.Errorf("failed to connect to server: %w", err)
-	}
-
 	// Start the server with the specified transport
 	switch m.serverTransport {
 	case "stdio":
@@ -60,56 +54,6 @@ func (m *MCPServer) Start(ctx context.Context, listenAddr string) error {
 	default:
 		return fmt.Errorf("unsupported server transport: %s", m.serverTransport)
 	}
-}
-
-// connectToServer establishes connection to the MCP server
-func (m *MCPServer) connectToServer(ctx context.Context) error {
-	m.logger.Info("Connecting to MCP server at %s...", m.client.endpoint)
-
-	var mcpClient *client.Client
-	var err error
-
-	switch m.client.transport {
-	case "sse":
-		mcpClient, err = client.NewSSEMCPClient(m.client.endpoint)
-		if err != nil {
-			return fmt.Errorf("failed to create SSE client: %w", err)
-		}
-	case "streamable-http":
-		mcpClient, err = client.NewStreamableHttpClient(m.client.endpoint)
-		if err != nil {
-			return fmt.Errorf("failed to create streamable HTTP client: %w", err)
-		}
-	default:
-		return fmt.Errorf("unsupported transport to connect to upstream: %s", m.client.transport)
-	}
-	m.client.client = mcpClient
-
-	// Start the transport
-	if err := mcpClient.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start client: %w", err)
-	}
-
-	// Initialize the session
-	if err := m.client.initialize(ctx); err != nil {
-		mcpClient.Close()
-		return fmt.Errorf("initialization failed: %w", err)
-	}
-
-	// List initial items
-	if err := m.client.listTools(ctx, true); err != nil {
-		m.logger.Error("Failed to list tools: %v", err)
-	}
-
-	if err := m.client.listResources(ctx, true); err != nil {
-		m.logger.Error("Failed to list resources: %v", err)
-	}
-
-	if err := m.client.listPrompts(ctx, true); err != nil {
-		m.logger.Error("Failed to list prompts: %v", err)
-	}
-
-	return nil
 }
 
 // registerTools registers all MCP tools

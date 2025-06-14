@@ -130,7 +130,9 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 
 	// Create and run agent client
 	client := agent.NewClient(endpoint, transport, logger)
-	logger.Info("Connecting to upstream MCP server at: %s (transport: %s)", endpoint, transport)
+	if err := client.Run(ctx); err != nil {
+		return fmt.Errorf("failed to connect client: %w", err)
+	}
 
 	// Run in MCP Server mode if requested
 	if mcpServer {
@@ -165,7 +167,7 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 	defer timeoutCancel()
 
 	// Run the agent in normal mode
-	if err := client.Run(timeoutCtx); err != nil {
+	if err := client.Listen(timeoutCtx); err != nil {
 		if err == context.DeadlineExceeded {
 			logger.Info("Timeout reached after %v", timeout)
 			return nil

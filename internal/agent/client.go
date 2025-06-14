@@ -20,18 +20,20 @@ type Client struct {
 	resourceCache      []mcp.Resource
 	promptCache        []mcp.Prompt
 	mu                 sync.RWMutex
+	notificationChan   chan mcp.JSONRPCNotification
 	serverCapabilities *mcp.ServerCapabilities
 }
 
 // NewClient creates a new agent client
 func NewClient(endpoint, transport string, logger *Logger) *Client {
 	return &Client{
-		endpoint:      endpoint,
-		transport:     transport,
-		logger:        logger,
-		toolCache:     []mcp.Tool{},
-		resourceCache: []mcp.Resource{},
-		promptCache:   []mcp.Prompt{},
+		endpoint:         endpoint,
+		transport:        transport,
+		logger:           logger,
+		toolCache:        []mcp.Tool{},
+		resourceCache:    []mcp.Resource{},
+		promptCache:      []mcp.Prompt{},
+		notificationChan: make(chan mcp.JSONRPCNotification, 10),
 	}
 }
 
@@ -65,10 +67,9 @@ func (c *Client) Run(ctx context.Context) error {
 	defer mcpClient.Close()
 
 	// Set up notification handler
-	notificationChan := make(chan mcp.JSONRPCNotification, 10)
 	mcpClient.OnNotification(func(notification mcp.JSONRPCNotification) {
 		select {
-		case notificationChan <- notification:
+		case c.notificationChan <- notification:
 		case <-ctx.Done():
 		}
 	})
@@ -103,6 +104,10 @@ func (c *Client) Run(ctx context.Context) error {
 		c.logger.Info("Server does not support prompts capability")
 	}
 
+	return nil
+}
+
+func (c *Client) Listen(ctx context.Context) error {
 	// Wait for notifications
 	c.logger.Info("Waiting for notifications (press Ctrl+C to exit)...")
 
@@ -112,7 +117,7 @@ func (c *Client) Run(ctx context.Context) error {
 			c.logger.Info("Shutting down...")
 			return nil
 
-		case notification := <-notificationChan:
+		case notification := <-c.notificationChan:
 			if err := c.handleNotification(ctx, notification); err != nil {
 				c.logger.Error("Failed to handle notification: %v", err)
 			}
