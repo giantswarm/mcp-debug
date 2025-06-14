@@ -128,9 +128,13 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 	// Create logger
 	logger := agent.NewLogger(verbose, !noColor, jsonRPC)
 
+	// Create and run agent client
+	client := agent.NewClient(endpoint, transport, logger)
+	logger.Info("Connecting to upstream MCP server at: %s (transport: %s)", endpoint, transport)
+
 	// Run in MCP Server mode if requested
 	if mcpServer {
-		server, err := agent.NewMCPServer(endpoint, transport, serverTransport, logger, false)
+		server, err := agent.NewMCPServer(client, serverTransport, logger, false)
 		if err != nil {
 			return fmt.Errorf("failed to create MCP server: %w", err)
 		}
@@ -139,16 +143,12 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 		if serverTransport == "streamable-http" {
 			logger.Info("Listening on %s", listenAddr)
 		}
-		logger.Info("Connecting to upstream MCP server at: %s (transport: %s)", endpoint, transport)
 
 		if err := server.Start(ctx, listenAddr); err != nil {
 			return fmt.Errorf("MCP server error: %w", err)
 		}
 		return nil
 	}
-
-	// Create and run agent client
-	client := agent.NewClient(endpoint, transport, logger)
 
 	// Run in REPL mode if requested
 	if repl {

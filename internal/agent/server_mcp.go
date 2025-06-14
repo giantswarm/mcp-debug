@@ -19,9 +19,7 @@ type MCPServer struct {
 }
 
 // NewMCPServer creates a new MCP server that exposes agent functionality
-func NewMCPServer(endpoint, clientTransport, serverTransport string, logger *Logger, notifyClients bool) (*MCPServer, error) {
-	client := NewClient(endpoint, clientTransport, logger)
-
+func NewMCPServer(client *Client, serverTransport string, logger *Logger, notifyClients bool) (*MCPServer, error) {
 	// Create MCP server
 	mcpServer := server.NewMCPServer(
 		"mcp-debug-agent",
