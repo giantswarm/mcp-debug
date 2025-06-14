@@ -82,7 +82,7 @@ func SetVersion(v string) {
 
 func init() {
 	// Add flags
-	rootCmd.Flags().StringVar(&endpoint, "endpoint", "http://localhost:8899/mcp", "MCP endpoint URL (must end with /mcp for streamable-http)")
+	rootCmd.Flags().StringVar(&endpoint, "endpoint", "http://localhost:8090/mcp", "MCP endpoint URL (must end with /mcp for streamable-http)")
 	rootCmd.Flags().StringVar(&transport, "transport", "streamable-http", "Transport protocol to use for client connections (streamable-http, sse)")
 	rootCmd.Flags().StringVar(&serverTransport, "server-transport", "stdio", "Transport protocol for the MCP server itself (stdio, streamable-http)")
 	rootCmd.Flags().StringVar(&listenAddr, "listen-addr", ":8899", "Listen address for streamable-http server (path is fixed to /mcp)")
