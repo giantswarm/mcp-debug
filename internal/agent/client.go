@@ -3,7 +3,10 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
+	"strings"
 	"sync"
 
 	"github.com/mark3labs/mcp-go/client"
@@ -39,6 +42,18 @@ func NewClient(endpoint, transport string, logger *Logger) *Client {
 
 // Run executes the agent workflow
 func (c *Client) Run(ctx context.Context) error {
+	return c.connectAndInitialize(ctx)
+}
+
+func (c *Client) Reconnect(ctx context.Context) error {
+	c.logger.Info("Attempting to reconnect to MCP server...")
+	if c.client != nil {
+		c.client.Close()
+	}
+	return c.connectAndInitialize(ctx)
+}
+
+func (c *Client) connectAndInitialize(ctx context.Context) error {
 	c.logger.Info("Connecting to MCP server at %s using %s transport...", c.endpoint, c.transport)
 
 	var mcpClient *client.Client
@@ -64,7 +79,6 @@ func (c *Client) Run(ctx context.Context) error {
 	if err := mcpClient.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start client: %w", err)
 	}
-	defer mcpClient.Close()
 
 	// Set up notification handler
 	mcpClient.OnNotification(func(notification mcp.JSONRPCNotification) {
@@ -493,4 +507,31 @@ func (c *Client) ServerSupportsPrompts() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.serverCapabilities != nil && c.serverCapabilities.Prompts != nil
+}
+
+func shouldReconnect(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check for context cancellation, which can happen on disconnect
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+
+	errMsg := strings.ToLower(err.Error())
+	if strings.Contains(errMsg, "connection refused") ||
+		strings.Contains(errMsg, "connection reset by peer") ||
+		strings.Contains(errMsg, "transport is closing") ||
+		strings.Contains(errMsg, "broken pipe") ||
+		strings.Contains(errMsg, "unexpected eof") {
+		return true
+	}
+
+	return false
 }
