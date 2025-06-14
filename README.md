@@ -10,6 +10,7 @@
 - **Interactive REPL**: Explore available tools, resources, and prompts interactively.
 - **MCP Server Mode**: Acts as an MCP server itself, allowing integration with AI assistants like Cursor.
 - **Verbose Logging**: Detailed logging of JSON-RPC messages for in-depth debugging.
+- **Self-Update**: Keep the tool up-to-date with a single command.
 
 ## Getting Started
 

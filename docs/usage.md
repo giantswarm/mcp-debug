@@ -11,6 +11,7 @@ This guide covers the main functionalities and how to use them.
   - [Installation](#installation)
     - [1. Pre-built Binaries (Recommended)](#1-pre-built-binaries-recommended)
     - [2. Build from Source](#2-build-from-source)
+  - [Keeping the Tool Updated](#keeping-the-tool-updated)
   - [Modes of Operation](#modes-of-operation)
     - [1. Normal Mode (Passive Listening)](#1-normal-mode-passive-listening)
     - [2. REPL Mode (Interactive Debugging)](#2-repl-mode-interactive-debugging)
@@ -69,6 +70,18 @@ make build
 ```
 
 This will create the `mcp-debug` binary in the project's root directory.
+
+---
+
+## Keeping the Tool Updated
+
+You can easily update `mcp-debug` to the latest version using the built-in `self-update` command. This will check GitHub for the latest release and replace the current binary if a newer version is available.
+
+```bash
+./mcp-debug self-update
+```
+
+This ensures you always have the latest features and bug fixes.
 
 ---
 
