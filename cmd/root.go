@@ -62,7 +62,7 @@ In MCP Server mode:
 - It's designed for integration with AI assistants like Claude or Cursor
 - Configure it in your AI assistant's MCP settings
 
-By default, it connects to http://localhost:8899/mcp. You can override this with the --endpoint flag.`,
+By default, it connects to http://localhost:8090/mcp. You can override this with the --endpoint flag.`,
 	RunE: runMCPDebug,
 }
 

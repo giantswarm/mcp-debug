@@ -31,7 +31,7 @@ For detailed instructions on modes, flags, and examples, please see the full usa
 
 **Connect to a server and listen for notifications:**
 ```bash
-./mcp-debug --endpoint http://localhost:8899/mcp
+./mcp-debug --endpoint http://localhost:8090/mcp
 ```
 
 **Start the interactive REPL:**

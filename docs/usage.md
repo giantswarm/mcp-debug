@@ -6,17 +6,21 @@ This guide covers the main functionalities and how to use them.
 
 ## Table of Contents
 
-- [Installation](#installation)
-- [Modes of Operation](#modes-of-operation)
-  - [1. Normal Mode (Passive Listening)](#1-normal-mode-passive-listening)
-  - [2. REPL Mode (Interactive Debugging)](#2-repl-mode-interactive-debugging)
-  - [3. MCP Server Mode (AI Assistant Integration)](#3-mcp-server-mode-ai-assistant-integration)
-- [Transport Protocols](#transport-protocols)
-- [Command-Line Flags](#command-line-flags)
-- [Usage Examples](#usage-examples)
-  - [Connecting to a Server](#connecting-to-a-server)
-  - [Using the REPL](#using-the-repl)
-  - [Running as an MCP Server](#running-as-an-mcp-server)
+- [Using mcp-debug](#using-mcp-debug)
+  - [Table of Contents](#table-of-contents)
+  - [Installation](#installation)
+    - [1. Pre-built Binaries (Recommended)](#1-pre-built-binaries-recommended)
+    - [2. Build from Source](#2-build-from-source)
+  - [Modes of Operation](#modes-of-operation)
+    - [1. Normal Mode (Passive Listening)](#1-normal-mode-passive-listening)
+    - [2. REPL Mode (Interactive Debugging)](#2-repl-mode-interactive-debugging)
+    - [3. MCP Server Mode (AI Assistant Integration)](#3-mcp-server-mode-ai-assistant-integration)
+  - [Transport Protocols](#transport-protocols)
+  - [Command-Line Flags](#command-line-flags)
+  - [Usage Examples](#usage-examples)
+    - [Connecting to a Server](#connecting-to-a-server)
+    - [Using the REPL](#using-the-repl)
+    - [Running as an MCP Server](#running-as-an-mcp-server)
 
 ---
 
@@ -80,7 +84,7 @@ This is the default mode. The tool connects to an MCP server, logs any notificat
 ```bash
 ./mcp-debug --endpoint <server-url>
 ```
-By default, it connects to `http://localhost:8899/mcp` and waits for 5 minutes.
+By default, it connects to `http://localhost:8090/mcp` and waits for 5 minutes.
 
 ### 2. REPL Mode (Interactive Debugging)
 
@@ -162,7 +166,7 @@ Here are the most important flags to configure `mcp-debug`:
 | ------------------- | ------------------------------------------------------------------------------------ | ------------------------------ |
 | `--repl`            | Start the interactive REPL mode.                                                     | `false`                        |
 | `--mcp-server`      | Run as an MCP server.                                                                | `false`                        |
-| `--endpoint`        | The URL of the target MCP server.                                                    | `http://localhost:8899/mcp`    |
+| `--endpoint`        | The URL of the target MCP server.                                                    | `http://localhost:8090/mcp`    |
 | `--transport`       | Client transport protocol (`streamable-http`, `sse`).                                | `streamable-http`              |
 | `--server-transport`| Server transport protocol (`stdio`, `streamable-http`).                                | `stdio`                        |
 | `--listen-addr`     | Listen address for the `streamable-http` server.                                     | `:8899`                        |
