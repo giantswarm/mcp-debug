@@ -6,6 +6,7 @@ import (
 	"mcp-debug/internal/agent"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,6 +22,9 @@ var (
 	jsonRPC   bool
 	repl      bool
 	mcpServer bool
+	transport string
+	serverTransport string
+	listenAddr string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -78,7 +82,10 @@ func SetVersion(v string) {
 
 func init() {
 	// Add flags
-	rootCmd.Flags().StringVar(&endpoint, "endpoint", "http://localhost:8090/sse", "SSE endpoint URL")
+	rootCmd.Flags().StringVar(&endpoint, "endpoint", "http://localhost:8090", "MCP endpoint URL")
+	rootCmd.Flags().StringVar(&transport, "transport", "streamable-http", "Transport protocol to use for client connections (streamable-http, sse)")
+	rootCmd.Flags().StringVar(&serverTransport, "server-transport", "stdio", "Transport protocol for the MCP server itself (stdio, streamable-http)")
+	rootCmd.Flags().StringVar(&listenAddr, "listen-addr", ":8091", "Listen address for streamable-http server")
 	rootCmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Timeout for waiting for notifications")
 	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "Enable verbose logging (show keepalive messages)")
 	rootCmd.Flags().BoolVar(&noColor, "no-color", false, "Disable colored output")
@@ -91,6 +98,18 @@ func init() {
 }
 
 func runMCPDebug(cmd *cobra.Command, args []string) error {
+	// Validate transport and endpoint combination
+	isSSEEndpoint := strings.HasSuffix(endpoint, "/sse")
+	isSSETransport := transport == "sse"
+
+	if isSSETransport && !isSSEEndpoint {
+		return fmt.Errorf("transport is 'sse' but endpoint '%s' does not end with /sse", endpoint)
+	}
+
+	if isSSEEndpoint && !isSSETransport {
+		return fmt.Errorf("endpoint '%s' looks like an SSE endpoint, but transport is '%s'. Please use --transport=sse", endpoint, transport)
+	}
+
 	// Create context with signal handling
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
@@ -111,22 +130,25 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 
 	// Run in MCP Server mode if requested
 	if mcpServer {
-		server, err := agent.NewMCPServer(endpoint, logger, false)
+		server, err := agent.NewMCPServer(endpoint, transport, serverTransport, logger, false)
 		if err != nil {
 			return fmt.Errorf("failed to create MCP server: %w", err)
 		}
 
-		logger.Info("Starting mcp-debug MCP server (stdio transport)...")
-		logger.Info("Connecting to MCP server at: %s", endpoint)
+		logger.Info("Starting mcp-debug MCP server (transport: %s)...", serverTransport)
+		if serverTransport == "streamable-http" {
+			logger.Info("Listening on %s", listenAddr)
+		}
+		logger.Info("Connecting to upstream MCP server at: %s (transport: %s)", endpoint, transport)
 
-		if err := server.Start(ctx); err != nil {
+		if err := server.Start(ctx, listenAddr); err != nil {
 			return fmt.Errorf("MCP server error: %w", err)
 		}
 		return nil
 	}
 
 	// Create and run agent client
-	client := agent.NewClient(endpoint, logger)
+	client := agent.NewClient(endpoint, transport, logger)
 
 	// Run in REPL mode if requested
 	if repl {

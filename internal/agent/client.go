@@ -13,6 +13,7 @@ import (
 // Client represents an MCP agent client
 type Client struct {
 	endpoint           string
+	transport          string
 	logger             *Logger
 	client             client.MCPClient
 	toolCache          []mcp.Tool
@@ -23,9 +24,10 @@ type Client struct {
 }
 
 // NewClient creates a new agent client
-func NewClient(endpoint string, logger *Logger) *Client {
+func NewClient(endpoint, transport string, logger *Logger) *Client {
 	return &Client{
 		endpoint:      endpoint,
+		transport:     transport,
 		logger:        logger,
 		toolCache:     []mcp.Tool{},
 		resourceCache: []mcp.Resource{},
@@ -35,24 +37,36 @@ func NewClient(endpoint string, logger *Logger) *Client {
 
 // Run executes the agent workflow
 func (c *Client) Run(ctx context.Context) error {
-	c.logger.Info("Connecting to MCP server at %s...", c.endpoint)
+	c.logger.Info("Connecting to MCP server at %s using %s transport...", c.endpoint, c.transport)
 
-	// Create SSE client
-	sseClient, err := client.NewSSEMCPClient(c.endpoint)
-	if err != nil {
-		return fmt.Errorf("failed to create SSE client: %w", err)
-	}
-	c.client = sseClient
+	var mcpClient *client.Client
+	var err error
 
-	// Start the SSE transport
-	if err := sseClient.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start SSE client: %w", err)
+	switch c.transport {
+	case "sse":
+		mcpClient, err = client.NewSSEMCPClient(c.endpoint)
+		if err != nil {
+			return fmt.Errorf("failed to create SSE client: %w", err)
+		}
+	case "streamable-http":
+		mcpClient, err = client.NewStreamableHttpClient(c.endpoint)
+		if err != nil {
+			return fmt.Errorf("failed to create streamable HTTP client: %w", err)
+		}
+	default:
+		return fmt.Errorf("unsupported transport: %s", c.transport)
 	}
-	defer sseClient.Close()
+	c.client = mcpClient
+
+	// Start the transport
+	if err := mcpClient.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start client: %w", err)
+	}
+	defer mcpClient.Close()
 
 	// Set up notification handler
 	notificationChan := make(chan mcp.JSONRPCNotification, 10)
-	sseClient.OnNotification(func(notification mcp.JSONRPCNotification) {
+	mcpClient.OnNotification(func(notification mcp.JSONRPCNotification) {
 		select {
 		case notificationChan <- notification:
 		case <-ctx.Done():
