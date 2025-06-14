@@ -11,12 +11,14 @@ This guide covers the main functionalities and how to use them.
   - [Installation](#installation)
     - [1. Pre-built Binaries (Recommended)](#1-pre-built-binaries-recommended)
     - [2. Build from Source](#2-build-from-source)
+  - [Keeping the Tool Updated](#keeping-the-tool-updated)
   - [Modes of Operation](#modes-of-operation)
     - [1. Normal Mode (Passive Listening)](#1-normal-mode-passive-listening)
     - [2. REPL Mode (Interactive Debugging)](#2-repl-mode-interactive-debugging)
     - [3. MCP Server Mode (AI Assistant Integration)](#3-mcp-server-mode-ai-assistant-integration)
   - [Transport Protocols](#transport-protocols)
   - [Command-Line Flags](#command-line-flags)
+  - [Shell Autocompletion](#shell-autocompletion)
   - [Usage Examples](#usage-examples)
     - [Connecting to a Server](#connecting-to-a-server)
     - [Using the REPL](#using-the-repl)
@@ -69,6 +71,18 @@ make build
 ```
 
 This will create the `mcp-debug` binary in the project's root directory.
+
+---
+
+## Keeping the Tool Updated
+
+You can easily update `mcp-debug` to the latest version using the built-in `self-update` command. This will check GitHub for the latest release and replace the current binary if a newer version is available.
+
+```bash
+./mcp-debug self-update
+```
+
+This ensures you always have the latest features and bug fixes.
 
 ---
 
@@ -175,6 +189,43 @@ Here are the most important flags to configure `mcp-debug`:
 | `--json-rpc`        | Enable full logging of JSON-RPC messages.                                            | `false`                        |
 | `--no-color`        | Disable colored output.                                                              | `false`                        |
 | `--version`         | Show the application version.                                                        |                                |
+
+---
+
+## Shell Autocompletion
+
+`mcp-debug` can generate autocompletion scripts for various shells. This helps you quickly complete commands and flags by pressing the `Tab` key.
+
+To generate the script for your shell, use the `completion` command.
+
+**Example for Bash:**
+
+To load completion for the current session, run:
+```bash
+source <(./mcp-debug completion bash)
+```
+
+To make it permanent for every new session, add it to your `~/.bashrc` file:
+```bash
+echo "source <(./mcp-debug completion bash)" >> ~/.bashrc
+```
+
+**Example for Zsh:**
+
+To load completion for the current session, run:
+```bash
+source <(./mcp-debug completion zsh)
+```
+
+To make it permanent, add to your `~/.zshrc`:
+```bash
+echo "source <(./mcp-debug completion zsh)" >> ~/.zshrc
+```
+
+For other shells like `fish` or `powershell`, you can get specific instructions by running:
+```bash
+./mcp-debug completion <shell> --help
+```
 
 ---
 
