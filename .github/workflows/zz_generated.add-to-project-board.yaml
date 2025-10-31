@@ -10,27 +10,35 @@ jobs:
   build_user_list:
     name: Get yaml config of GS users
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
     - name: Get user-mapping
+      env:
+        GH_TOKEN: ${{ secrets.ISSUE_AUTOMATION }}
       run: |
         mkdir -p artifacts
-        wget --header "Authorization: token ${{ secrets.ISSUE_AUTOMATION }}" \
-          -O artifacts/users.yaml \
-          https://raw.githubusercontent.com/giantswarm/github/main/tools/issue-automation/user-mapping.yaml
+        gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" \
+          /repos/giantswarm/github/contents/tools/issue-automation/user-mapping.yaml \
+          | jq -r '.content' \
+          | base64 -d > artifacts/users.yaml
     - name: Upload Artifact
-      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
       with:
         name: users
         path: artifacts/users.yaml
         retention-days: 1
     - name: Get label-mapping
+      env:
+        GH_TOKEN: ${{ secrets.ISSUE_AUTOMATION }}
       run: |
         mkdir -p artifacts
-        wget --header "Authorization: token ${{ secrets.ISSUE_AUTOMATION }}" \
-          -O artifacts/labels.yaml \
-          https://raw.githubusercontent.com/giantswarm/github/main/tools/issue-automation/label-mapping.yaml
+        gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" \
+          /repos/giantswarm/github/contents/tools/issue-automation/label-mapping.yaml \
+          | jq -r '.content' \
+          | base64 -d > artifacts/labels.yaml
     - name: Upload Artifact
-      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
       with:
         name: labels
         path: artifacts/labels.yaml
@@ -42,7 +50,7 @@ jobs:
     needs: build_user_list
     if: github.event.action == 'assigned'
     steps:
-    - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53  # v6.0.0
+    - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e  # v4.1.7
       id: download-users
       with:
         name: users
@@ -57,7 +65,7 @@ jobs:
         echo "BOARD=${BOARD}" >> $GITHUB_ENV
     - name: Add issue to personal board
       if: ${{ env.BOARD != 'null' && env.BOARD != ''  && env.BOARD != null }}
-      uses: actions/add-to-project@244f685bbc3b7adfa8466e08b698b5577571133e # v1.0.2
+      uses: actions/add-to-project@9bfe908f2eaa7ba10340b31e314148fcfe6a2458 # v1.0.1
       with:
         project-url: ${{ env.BOARD }}
         github-token: ${{ secrets.ISSUE_AUTOMATION }}
@@ -68,7 +76,7 @@ jobs:
     needs: build_user_list
     if: github.event.action == 'labeled'
     steps:
-    - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53  # v6.0.0
+    - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e  # v4.1.7
       id: download-labels
       with:
         name: labels
@@ -83,7 +91,7 @@ jobs:
         echo "BOARD=${BOARD}" >> $GITHUB_ENV
     - name: Add issue to team board
       if: ${{ env.BOARD != 'null' && env.BOARD != '' && env.BOARD != null }}
-      uses: actions/add-to-project@244f685bbc3b7adfa8466e08b698b5577571133e # v1.0.2
+      uses: actions/add-to-project@9bfe908f2eaa7ba10340b31e314148fcfe6a2458 # v1.0.1
       with:
         project-url: ${{ env.BOARD }}
         github-token: ${{ secrets.ISSUE_AUTOMATION }}
