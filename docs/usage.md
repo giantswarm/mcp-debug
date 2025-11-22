@@ -208,6 +208,7 @@ The tool will automatically register itself with the authorization server and ob
 | `--oauth-scopes` | OAuth scopes to request (comma-separated) | `mcp:tools,mcp:resources` |
 | `--oauth-redirect-url` | Redirect URL for OAuth callback | `http://localhost:8765/callback` |
 | `--oauth-pkce` | Use PKCE for authorization | `true` |
+| `--oauth-timeout` | Maximum time to wait for OAuth authorization | `5m` |
 
 ### OAuth Flow
 
@@ -255,6 +256,39 @@ Try connecting without credentials to see if the server supports DCR:
 ```
 
 If the server supports RFC 7591 Dynamic Client Registration, mcp-debug will automatically register and obtain credentials.
+
+**What happens during DCR:**
+1. mcp-debug discovers the OAuth authorization server metadata
+2. It checks if the server supports dynamic client registration
+3. If supported, it sends a registration request with:
+   - Client name: `mcp-debug` (or `mcp-debug/v1.2.3` with version)
+   - Redirect URI: `http://localhost:8765/callback`
+   - Grant types: `authorization_code`, `refresh_token`
+4. The server responds with a `client_id` (and optionally `client_secret`)
+5. mcp-debug uses these credentials for the OAuth flow
+6. You complete the authorization in your browser
+7. mcp-debug exchanges the code for tokens and connects
+
+**Example DCR session:**
+```bash
+$ ./mcp-debug --oauth --endpoint https://api.example.com/mcp
+[2025-11-22 10:15:30] OAuth enabled - will attempt Dynamic Client Registration
+[2025-11-22 10:15:31] OAuth authorization required
+[2025-11-22 10:15:31] No client ID configured, attempting dynamic client registration...
+[2025-11-22 10:15:32] ✓ Client registered successfully with ID: dcr_client_abc123xyz
+[2025-11-22 10:15:32] Opening browser for authorization...
+[2025-11-22 10:15:33] Waiting for authorization...
+[2025-11-22 10:15:45] ✓ Authorization code received
+[2025-11-22 10:15:45] Exchanging code for access token...
+[2025-11-22 10:15:46] ✓ Access token obtained successfully!
+[2025-11-22 10:15:46] ✓ Session initialized successfully (protocol: 2024-11-05)
+```
+
+**Custom timeout for authorization:**
+```bash
+# Wait up to 10 minutes for user to complete authorization
+./mcp-debug --oauth --oauth-timeout 10m --endpoint https://api.example.com/mcp
+```
 
 **Option 2: Register Your Own OAuth Application**
 

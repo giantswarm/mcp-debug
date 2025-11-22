@@ -33,6 +33,7 @@ var (
 	oauthScopes       []string
 	oauthRedirectURL  string
 	oauthUsePKCE      bool
+	oauthTimeout      time.Duration
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -108,6 +109,7 @@ func init() {
 	rootCmd.Flags().StringSliceVar(&oauthScopes, "oauth-scopes", []string{"mcp:tools", "mcp:resources"}, "OAuth scopes to request")
 	rootCmd.Flags().StringVar(&oauthRedirectURL, "oauth-redirect-url", "http://localhost:8765/callback", "OAuth redirect URL for callback")
 	rootCmd.Flags().BoolVar(&oauthUsePKCE, "oauth-pkce", true, "Use PKCE (Proof Key for Code Exchange) for OAuth flow")
+	rootCmd.Flags().DurationVar(&oauthTimeout, "oauth-timeout", 5*time.Minute, "Maximum time to wait for OAuth authorization")
 
 	// Add subcommands
 	rootCmd.AddCommand(newSelfUpdateCmd())
@@ -154,12 +156,13 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 		}
 
 		oauthConfig = &agent.OAuthConfig{
-			Enabled:      true,
-			ClientID:     oauthClientID,
-			ClientSecret: oauthClientSecret,
-			Scopes:       oauthScopes,
-			RedirectURL:  oauthRedirectURL,
-			UsePKCE:      oauthUsePKCE,
+			Enabled:              true,
+			ClientID:             oauthClientID,
+			ClientSecret:         oauthClientSecret,
+			Scopes:               oauthScopes,
+			RedirectURL:          oauthRedirectURL,
+			UsePKCE:              oauthUsePKCE,
+			AuthorizationTimeout: oauthTimeout,
 		}
 
 		// Validate OAuth configuration

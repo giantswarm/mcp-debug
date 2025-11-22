@@ -13,6 +13,18 @@ import (
 	"github.com/mark3labs/mcp-go/client/transport"
 )
 
+// callbackServerConfig holds configuration for the OAuth callback server
+type callbackServerConfig struct {
+	redirectURL string
+	logger      *Logger
+}
+
+// callbackResult contains the result from the OAuth callback
+type callbackResult struct {
+	params map[string]string
+	err    error
+}
+
 // handleMCPOAuthFlow handles OAuth authorization using mcp-go's built-in OAuth handler
 func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport.OAuthHandler) error {
 	c.logger.Info("OAuth authorization required")
@@ -56,73 +68,14 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 	}
 
 	// Start callback server
-	callbackChan := make(chan map[string]string, 1)
-	errChan := make(chan error, 1)
-
-	redirectURI := c.oauthConfig.RedirectURL
-	parsedURL, err := url.Parse(redirectURI)
+	config := &callbackServerConfig{
+		redirectURL: c.oauthConfig.RedirectURL,
+		logger:      c.logger,
+	}
+	server, resultChan, err := startCallbackServer(config)
 	if err != nil {
-		return fmt.Errorf("invalid redirect URI: %w", err)
+		return fmt.Errorf("failed to start callback server: %w", err)
 	}
-
-	// Create isolated ServeMux to avoid conflicts with global http.DefaultServeMux
-	mux := http.NewServeMux()
-	mux.HandleFunc(parsedURL.Path, func(w http.ResponseWriter, r *http.Request) {
-		// Security: Only accept GET requests (standard for OAuth callbacks)
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		params := make(map[string]string)
-		for key, values := range r.URL.Query() {
-			if len(values) > 0 {
-				params[key] = values[0]
-			}
-		}
-
-		if params["error"] != "" {
-			select {
-			case errChan <- fmt.Errorf("authorization error: %s - %s", params["error"], params["error_description"]):
-			default:
-				// Channel already consumed, log and continue
-				c.logger.Warning("Error occurred but callback already processed")
-			}
-			http.Error(w, "Authorization failed", http.StatusBadRequest)
-			return
-		}
-
-		select {
-		case callbackChan <- params:
-		default:
-			// Channel already consumed, log and continue
-			c.logger.Warning("Callback received but already processed")
-		}
-		w.Header().Set("Content-Type", "text/html")
-		if _, err := w.Write([]byte(`<html><body><h1>✅ Authorization Successful!</h1><p>You can close this window.</p></body></html>`)); err != nil {
-			c.logger.Warning("Failed to write response: %v", err)
-		}
-	})
-
-	// Create server with security timeouts
-	server := &http.Server{
-		Addr:         parsedURL.Host,
-		Handler:      mux,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  30 * time.Second,
-	}
-
-	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			select {
-			case errChan <- fmt.Errorf("callback server error: %w", err):
-			default:
-				// Channel already consumed, log and continue
-				c.logger.Warning("Server error occurred but callback already processed")
-			}
-		}
-	}()
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -142,23 +95,25 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 
 	// Wait for callback
 	c.logger.Info("Waiting for authorization...")
-	var params map[string]string
 
 	timeout := c.oauthConfig.AuthorizationTimeout
 	if timeout == 0 {
 		timeout = 5 * time.Minute
 	}
 
+	var result callbackResult
 	select {
-	case params = <-callbackChan:
-		// Got callback
-	case err := <-errChan:
-		return err
+	case result = <-resultChan:
+		if result.err != nil {
+			return result.err
+		}
 	case <-time.After(timeout):
 		return fmt.Errorf("authorization timeout after %v", timeout)
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+
+	params := result.params
 
 	// Verify state
 	if params["state"] != state {
@@ -183,7 +138,87 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 	return nil
 }
 
-// openBrowser opens the specified URL in the default browser
+// startCallbackServer starts an HTTP server to receive OAuth callbacks
+func startCallbackServer(config *callbackServerConfig) (*http.Server, <-chan callbackResult, error) {
+	parsedURL, err := url.Parse(config.redirectURL)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid redirect URI: %w", err)
+	}
+
+	resultChan := make(chan callbackResult, 1)
+
+	// Create isolated ServeMux to avoid conflicts with global http.DefaultServeMux
+	mux := http.NewServeMux()
+	mux.HandleFunc(parsedURL.Path, createCallbackHandler(config.logger, resultChan))
+
+	// Create server with security timeouts
+	server := &http.Server{
+		Addr:         parsedURL.Host,
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  30 * time.Second,
+	}
+
+	// Start server in background
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			select {
+			case resultChan <- callbackResult{err: fmt.Errorf("callback server error: %w", err)}:
+			default:
+				config.logger.Warning("Server error occurred but callback already processed")
+			}
+		}
+	}()
+
+	return server, resultChan, nil
+}
+
+// createCallbackHandler creates an HTTP handler for OAuth callbacks
+func createCallbackHandler(logger *Logger, resultChan chan<- callbackResult) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Security: Only accept GET requests (standard for OAuth callbacks)
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		params := make(map[string]string)
+		for key, values := range r.URL.Query() {
+			if len(values) > 0 {
+				params[key] = values[0]
+			}
+		}
+
+		// Check for error response
+		if params["error"] != "" {
+			select {
+			case resultChan <- callbackResult{
+				err: fmt.Errorf("authorization error: %s - %s", params["error"], params["error_description"]),
+			}:
+			default:
+				logger.Warning("Error occurred but callback already processed")
+			}
+			http.Error(w, "Authorization failed", http.StatusBadRequest)
+			return
+		}
+
+		// Success - send params
+		select {
+		case resultChan <- callbackResult{params: params}:
+		default:
+			logger.Warning("Callback received but already processed")
+		}
+
+		w.Header().Set("Content-Type", "text/html")
+		if _, err := w.Write([]byte(`<html><body><h1>✅ Authorization Successful!</h1><p>You can close this window.</p></body></html>`)); err != nil {
+			logger.Warning("Failed to write response: %v", err)
+		}
+	}
+}
+
+// openBrowser opens the specified URL in the default browser.
+// It validates the URL scheme and uses platform-specific commands.
 func openBrowser(urlStr string) error {
 	// Security: Validate URL scheme before opening in browser
 	parsedURL, err := url.Parse(urlStr)
@@ -205,7 +240,7 @@ func openBrowser(urlStr string) error {
 	case "windows":
 		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", urlStr)
 	default:
-		return fmt.Errorf("unsupported platform")
+		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}
 
 	return cmd.Start()
