@@ -1,6 +1,9 @@
 package agent
 
-import "fmt"
+import (
+	"fmt"
+	"net/url"
+)
 
 // OAuthConfig contains OAuth 2.1 configuration for authenticating with MCP servers
 type OAuthConfig struct {
@@ -42,6 +45,23 @@ func (c *OAuthConfig) Validate() error {
 	// RedirectURL is required for the callback server
 	if c.RedirectURL == "" {
 		return fmt.Errorf("OAuth redirect URL is required")
+	}
+
+	// Validate redirect URL and ensure HTTP is only used for localhost
+	parsedURL, err := url.Parse(c.RedirectURL)
+	if err != nil {
+		return fmt.Errorf("invalid OAuth redirect URL: %w", err)
+	}
+
+	// Security: Only allow HTTP for localhost/loopback addresses
+	if parsedURL.Scheme == "http" {
+		hostname := parsedURL.Hostname()
+		// Note: Hostname() strips brackets from IPv6 addresses, so [::1] becomes ::1
+		if hostname != "localhost" && hostname != "127.0.0.1" && hostname != "::1" {
+			return fmt.Errorf("HTTP redirect URIs are only allowed for localhost/127.0.0.1/[::1], use HTTPS for other hosts")
+		}
+	} else if parsedURL.Scheme != "https" {
+		return fmt.Errorf("redirect URI scheme must be http (localhost only) or https, got: %s", parsedURL.Scheme)
 	}
 
 	// Set default scopes if none provided

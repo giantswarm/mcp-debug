@@ -52,6 +52,69 @@ func TestOAuthConfig_Validate(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "http redirect for localhost is allowed",
+			config: &OAuthConfig{
+				Enabled:     true,
+				RedirectURL: "http://localhost:8765/callback",
+				Scopes:      []string{"mcp:tools"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "http redirect for 127.0.0.1 is allowed",
+			config: &OAuthConfig{
+				Enabled:     true,
+				RedirectURL: "http://127.0.0.1:8765/callback",
+				Scopes:      []string{"mcp:tools"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "http redirect for IPv6 loopback is allowed",
+			config: &OAuthConfig{
+				Enabled:     true,
+				RedirectURL: "http://[::1]:8765/callback",
+				Scopes:      []string{"mcp:tools"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "http redirect for non-localhost is rejected",
+			config: &OAuthConfig{
+				Enabled:     true,
+				RedirectURL: "http://example.com/callback",
+				Scopes:      []string{"mcp:tools"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "https redirect is allowed for any host",
+			config: &OAuthConfig{
+				Enabled:     true,
+				RedirectURL: "https://example.com/callback",
+				Scopes:      []string{"mcp:tools"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid redirect URL scheme",
+			config: &OAuthConfig{
+				Enabled:     true,
+				RedirectURL: "ftp://localhost/callback",
+				Scopes:      []string{"mcp:tools"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "malformed redirect URL",
+			config: &OAuthConfig{
+				Enabled:     true,
+				RedirectURL: "://invalid",
+				Scopes:      []string{"mcp:tools"},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

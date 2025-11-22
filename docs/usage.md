@@ -220,16 +220,16 @@ When you run `mcp-debug` with OAuth enabled:
 5. You log in and grant permissions
 6. The authorization server redirects back to mcp-debug
 7. **mcp-debug** exchanges the authorization code for an access token
-8. Tokens are stored securely at `~/.mcp-debug/tokens.json`
-9. The connection proceeds with authenticated requests
+8. The connection proceeds with authenticated requests
 
 ### Token Management
 
 Tokens are managed automatically by mcp-go:
 
-- **Stored in memory** during the session
-- **Automatically refreshed** when expired
-- **Not persisted** to disk (re-authorization required per session)
+- **Stored in memory only** during the session (for security)
+- **Automatically refreshed** when expired (if refresh tokens are supported)
+- **Not persisted** to disk - you'll need to re-authenticate each time you run mcp-debug
+- This provides better security by preventing token theft from disk storage
 
 ### OAuth with REPL Mode
 

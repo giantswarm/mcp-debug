@@ -147,6 +147,12 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 	// Create OAuth config if enabled
 	var oauthConfig *agent.OAuthConfig
 	if oauthEnabled {
+		// Security warning: Check if client secret was passed via CLI flag
+		if oauthClientSecret != "" && cmd.Flags().Changed("oauth-client-secret") {
+			logger.Warning("⚠️  Security Warning: Client secret passed via CLI flag is visible in process listings")
+			logger.Info("Consider using environment variables instead: export OAUTH_CLIENT_SECRET=\"...\"")
+		}
+
 		oauthConfig = &agent.OAuthConfig{
 			Enabled:      true,
 			ClientID:     oauthClientID,

@@ -58,8 +58,15 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 		return fmt.Errorf("invalid redirect URI: %w", err)
 	}
 
-	server := &http.Server{Addr: parsedURL.Host}
-	http.HandleFunc(parsedURL.Path, func(w http.ResponseWriter, r *http.Request) {
+	// Create isolated ServeMux to avoid conflicts with global http.DefaultServeMux
+	mux := http.NewServeMux()
+	mux.HandleFunc(parsedURL.Path, func(w http.ResponseWriter, r *http.Request) {
+		// Security: Only accept GET requests (standard for OAuth callbacks)
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
 		params := make(map[string]string)
 		for key, values := range r.URL.Query() {
 			if len(values) > 0 {
@@ -77,6 +84,15 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 		w.Header().Set("Content-Type", "text/html")
 		w.Write([]byte(`<html><body><h1>✅ Authorization Successful!</h1><p>You can close this window.</p></body></html>`))
 	})
+
+	// Create server with security timeouts
+	server := &http.Server{
+		Addr:         parsedURL.Host,
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  30 * time.Second,
+	}
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -132,16 +148,26 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 }
 
 // openBrowser opens the specified URL in the default browser
-func openBrowser(url string) error {
+func openBrowser(urlStr string) error {
+	// Security: Validate URL scheme before opening in browser
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return fmt.Errorf("invalid URL scheme for browser: %s (only http/https allowed)", parsedURL.Scheme)
+	}
+
 	var cmd *exec.Cmd
 
 	switch runtime.GOOS {
 	case "linux":
-		cmd = exec.Command("xdg-open", url)
+		cmd = exec.Command("xdg-open", urlStr)
 	case "darwin":
-		cmd = exec.Command("open", url)
+		cmd = exec.Command("open", urlStr)
 	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", urlStr)
 	default:
 		return fmt.Errorf("unsupported platform")
 	}
