@@ -3,6 +3,20 @@
         "mcp-debug": {
             "command": "mcp-debug",
             "args": ["--mcp-server", "--endpoint", "http://localhost:8090/mcp"]
+        },
+        "mcp-debug-with-oauth": {
+            "command": "mcp-debug",
+            "args": [
+                "--mcp-server",
+                "--endpoint", "https://protected-server.com/mcp",
+                "--oauth",
+                "--oauth-client-id", "${OAUTH_CLIENT_ID}",
+                "--oauth-client-secret", "${OAUTH_CLIENT_SECRET}"
+            ],
+            "env": {
+                "OAUTH_CLIENT_ID": "your-client-id-here",
+                "OAUTH_CLIENT_SECRET": "your-client-secret-here"
+            }
         }
     }
 } 
