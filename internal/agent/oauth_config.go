@@ -1,0 +1,112 @@
+package agent
+
+import (
+	"fmt"
+	"net/url"
+	"time"
+)
+
+// OAuthConfig contains OAuth 2.1 configuration for authenticating with MCP servers
+type OAuthConfig struct {
+	// Enabled indicates whether OAuth authentication should be used
+	Enabled bool
+
+	// ClientID is the OAuth client identifier (optional - will use DCR if not provided)
+	ClientID string
+
+	// ClientSecret is the OAuth client secret (optional for public clients)
+	ClientSecret string
+
+	// Scopes are the OAuth scopes to request (default: mcp:tools, mcp:resources)
+	Scopes []string
+
+	// RedirectURL is the callback URL for OAuth flow (default: http://localhost:8765/callback)
+	RedirectURL string
+
+	// UsePKCE enables Proof Key for Code Exchange (recommended, enabled by default)
+	UsePKCE bool
+
+	// AuthorizationTimeout is the maximum time to wait for user authorization (default: 5 minutes)
+	AuthorizationTimeout time.Duration
+
+	// UseOIDC enables OpenID Connect features including nonce validation (optional)
+	UseOIDC bool
+}
+
+// DefaultOAuthConfig returns a default OAuth configuration
+func DefaultOAuthConfig() *OAuthConfig {
+	return &OAuthConfig{
+		Enabled:              false,
+		Scopes:               []string{"mcp:tools", "mcp:resources"},
+		RedirectURL:          "http://localhost:8765/callback",
+		UsePKCE:              true,
+		AuthorizationTimeout: 5 * time.Minute,
+		UseOIDC:              false, // OIDC features disabled by default
+	}
+}
+
+// WithDefaults returns a new config with defaults applied for any unset fields
+func (c *OAuthConfig) WithDefaults() *OAuthConfig {
+	config := *c
+
+	// Set default scopes if none provided
+	if len(config.Scopes) == 0 {
+		config.Scopes = []string{"mcp:tools", "mcp:resources"}
+	}
+
+	// Set default timeout if not provided
+	if config.AuthorizationTimeout == 0 {
+		config.AuthorizationTimeout = 5 * time.Minute
+	}
+
+	// Set default redirect URL if not provided
+	if config.RedirectURL == "" {
+		config.RedirectURL = "http://localhost:8765/callback"
+	}
+
+	return &config
+}
+
+// Validate checks if the OAuth configuration is valid (read-only, does not modify config)
+func (c *OAuthConfig) Validate() error {
+	if !c.Enabled {
+		return nil
+	}
+
+	// RedirectURL is required for the callback server
+	if c.RedirectURL == "" {
+		return fmt.Errorf("OAuth redirect URL is required")
+	}
+
+	// Validate redirect URL and ensure HTTP is only used for localhost
+	parsedURL, err := url.Parse(c.RedirectURL)
+	if err != nil {
+		return fmt.Errorf("invalid OAuth redirect URL: %w", err)
+	}
+
+	// Security: Only allow HTTP for localhost/loopback addresses
+	// Note: HTTPS redirect URIs are not supported for the callback server (which only runs on localhost)
+	if parsedURL.Scheme == "http" {
+		hostname := parsedURL.Hostname()
+		// Note: Hostname() strips brackets from IPv6 addresses, so [::1] becomes ::1
+		if hostname != "localhost" && hostname != "127.0.0.1" && hostname != "::1" {
+			return fmt.Errorf("HTTP redirect URIs are only allowed for localhost/127.0.0.1/[::1], got: %s", hostname)
+		}
+	} else if parsedURL.Scheme == "https" {
+		return fmt.Errorf("HTTPS redirect URIs are not supported - callback server only runs on localhost with HTTP (use http://localhost:PORT/callback)")
+	} else {
+		return fmt.Errorf("redirect URI scheme must be http, got: %s (only http://localhost:PORT/callback is supported)", parsedURL.Scheme)
+	}
+
+	// Validate scopes are set (after defaults have been applied)
+	if len(c.Scopes) == 0 {
+		return fmt.Errorf("OAuth scopes are required")
+	}
+
+	// Validate timeout is set (after defaults have been applied)
+	if c.AuthorizationTimeout == 0 {
+		return fmt.Errorf("OAuth authorization timeout is required")
+	}
+
+	return nil
+}
