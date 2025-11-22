@@ -1,7 +1,9 @@
 package agent
 
 import (
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestOAuthConfig_Validate(t *testing.T) {
@@ -13,19 +15,21 @@ func TestOAuthConfig_Validate(t *testing.T) {
 		{
 			name: "valid config with client ID",
 			config: &OAuthConfig{
-				Enabled:     true,
-				ClientID:    "test-client-id",
-				RedirectURL: "http://localhost:8765/callback",
-				Scopes:      []string{"mcp:tools"},
+				Enabled:              true,
+				ClientID:             "test-client-id",
+				RedirectURL:          "http://localhost:8765/callback",
+				Scopes:               []string{"mcp:tools"},
+				AuthorizationTimeout: 5 * time.Minute,
 			},
 			wantErr: false,
 		},
 		{
 			name: "valid config without client ID (DCR)",
 			config: &OAuthConfig{
-				Enabled:     true,
-				RedirectURL: "http://localhost:8765/callback",
-				Scopes:      []string{"mcp:tools"},
+				Enabled:              true,
+				RedirectURL:          "http://localhost:8765/callback",
+				Scopes:               []string{"mcp:tools"},
+				AuthorizationTimeout: 5 * time.Minute,
 			},
 			wantErr: false,
 		},
@@ -44,38 +48,50 @@ func TestOAuthConfig_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "empty scopes get defaults",
+			name: "empty scopes fail validation",
 			config: &OAuthConfig{
 				Enabled:     true,
 				RedirectURL: "http://localhost:8765/callback",
 				Scopes:      []string{},
 			},
+			wantErr: true,
+		},
+		{
+			name: "empty scopes pass validation after WithDefaults",
+			config: (&OAuthConfig{
+				Enabled:     true,
+				RedirectURL: "http://localhost:8765/callback",
+				Scopes:      []string{},
+			}).WithDefaults(),
 			wantErr: false,
 		},
 		{
 			name: "http redirect for localhost is allowed",
 			config: &OAuthConfig{
-				Enabled:     true,
-				RedirectURL: "http://localhost:8765/callback",
-				Scopes:      []string{"mcp:tools"},
+				Enabled:              true,
+				RedirectURL:          "http://localhost:8765/callback",
+				Scopes:               []string{"mcp:tools"},
+				AuthorizationTimeout: 5 * time.Minute,
 			},
 			wantErr: false,
 		},
 		{
 			name: "http redirect for 127.0.0.1 is allowed",
 			config: &OAuthConfig{
-				Enabled:     true,
-				RedirectURL: "http://127.0.0.1:8765/callback",
-				Scopes:      []string{"mcp:tools"},
+				Enabled:              true,
+				RedirectURL:          "http://127.0.0.1:8765/callback",
+				Scopes:               []string{"mcp:tools"},
+				AuthorizationTimeout: 5 * time.Minute,
 			},
 			wantErr: false,
 		},
 		{
 			name: "http redirect for IPv6 loopback is allowed",
 			config: &OAuthConfig{
-				Enabled:     true,
-				RedirectURL: "http://[::1]:8765/callback",
-				Scopes:      []string{"mcp:tools"},
+				Enabled:              true,
+				RedirectURL:          "http://[::1]:8765/callback",
+				Scopes:               []string{"mcp:tools"},
+				AuthorizationTimeout: 5 * time.Minute,
 			},
 			wantErr: false,
 		},
@@ -132,14 +148,6 @@ func TestOAuthConfig_Validate(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
-
-			// Check that default scopes were set if needed
-			if !tt.wantErr && tt.config.Enabled && len(tt.config.Scopes) == 0 {
-				if len(tt.config.Scopes) < 1 {
-					// Note: Validate() should have set default scopes
-					t.Log("Scopes should be set to defaults after validation")
-				}
-			}
 		})
 	}
 }
@@ -165,6 +173,96 @@ func TestDefaultOAuthConfig(t *testing.T) {
 
 	if config.UseOIDC {
 		t.Error("Default config should have UseOIDC = false")
+	}
+}
+
+func TestOAuthConfig_WithDefaults(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   *OAuthConfig
+		expected *OAuthConfig
+	}{
+		{
+			name: "empty config gets all defaults",
+			config: &OAuthConfig{
+				Enabled: true,
+			},
+			expected: &OAuthConfig{
+				Enabled:              true,
+				Scopes:               []string{"mcp:tools", "mcp:resources"},
+				RedirectURL:          "http://localhost:8765/callback",
+				AuthorizationTimeout: 5 * time.Minute,
+			},
+		},
+		{
+			name: "partial config keeps custom values",
+			config: &OAuthConfig{
+				Enabled:     true,
+				ClientID:    "custom-client",
+				RedirectURL: "http://localhost:9999/callback",
+			},
+			expected: &OAuthConfig{
+				Enabled:              true,
+				ClientID:             "custom-client",
+				RedirectURL:          "http://localhost:9999/callback",
+				Scopes:               []string{"mcp:tools", "mcp:resources"},
+				AuthorizationTimeout: 5 * time.Minute,
+			},
+		},
+		{
+			name: "fully specified config unchanged",
+			config: &OAuthConfig{
+				Enabled:              true,
+				ClientID:             "custom-client",
+				ClientSecret:         "custom-secret",
+				Scopes:               []string{"custom:scope"},
+				RedirectURL:          "http://localhost:9999/callback",
+				UsePKCE:              false,
+				AuthorizationTimeout: 10 * time.Minute,
+				UseOIDC:              true,
+			},
+			expected: &OAuthConfig{
+				Enabled:              true,
+				ClientID:             "custom-client",
+				ClientSecret:         "custom-secret",
+				Scopes:               []string{"custom:scope"},
+				RedirectURL:          "http://localhost:9999/callback",
+				UsePKCE:              false,
+				AuthorizationTimeout: 10 * time.Minute,
+				UseOIDC:              true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.config.WithDefaults()
+
+			if result.Enabled != tt.expected.Enabled {
+				t.Errorf("Enabled = %v, want %v", result.Enabled, tt.expected.Enabled)
+			}
+			if result.ClientID != tt.expected.ClientID {
+				t.Errorf("ClientID = %v, want %v", result.ClientID, tt.expected.ClientID)
+			}
+			if result.ClientSecret != tt.expected.ClientSecret {
+				t.Errorf("ClientSecret = %v, want %v", result.ClientSecret, tt.expected.ClientSecret)
+			}
+			if result.RedirectURL != tt.expected.RedirectURL {
+				t.Errorf("RedirectURL = %v, want %v", result.RedirectURL, tt.expected.RedirectURL)
+			}
+			if result.UsePKCE != tt.expected.UsePKCE {
+				t.Errorf("UsePKCE = %v, want %v", result.UsePKCE, tt.expected.UsePKCE)
+			}
+			if result.AuthorizationTimeout != tt.expected.AuthorizationTimeout {
+				t.Errorf("AuthorizationTimeout = %v, want %v", result.AuthorizationTimeout, tt.expected.AuthorizationTimeout)
+			}
+			if result.UseOIDC != tt.expected.UseOIDC {
+				t.Errorf("UseOIDC = %v, want %v", result.UseOIDC, tt.expected.UseOIDC)
+			}
+			if len(result.Scopes) != len(tt.expected.Scopes) {
+				t.Errorf("Scopes length = %v, want %v", len(result.Scopes), len(tt.expected.Scopes))
+			}
+		})
 	}
 }
 
@@ -266,6 +364,11 @@ func TestOAuthConfig_HTTPSValidation(t *testing.T) {
 				Scopes:      []string{"mcp:tools"},
 			}
 
+			// Apply defaults for non-error cases to ensure all required fields are set
+			if !tt.wantErr {
+				config = config.WithDefaults()
+			}
+
 			err := config.Validate()
 
 			if tt.wantErr {
@@ -273,7 +376,7 @@ func TestOAuthConfig_HTTPSValidation(t *testing.T) {
 					t.Errorf("Expected error but got nil")
 					return
 				}
-				if tt.errContains != "" && !contains(err.Error(), tt.errContains) {
+				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("Error %q does not contain %q", err.Error(), tt.errContains)
 				}
 			} else {
@@ -292,6 +395,9 @@ func TestOAuthConfig_OIDCFeatures(t *testing.T) {
 		UseOIDC:     true,
 	}
 
+	// Apply defaults before validation
+	config = config.WithDefaults()
+
 	err := config.Validate()
 	if err != nil {
 		t.Errorf("Validation failed for OIDC config: %v", err)
@@ -300,19 +406,4 @@ func TestOAuthConfig_OIDCFeatures(t *testing.T) {
 	if !config.UseOIDC {
 		t.Error("Expected UseOIDC to be true")
 	}
-}
-
-// Helper function for substring checking
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && indexOf(s, substr) >= 0))
-}
-
-func indexOf(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
 }

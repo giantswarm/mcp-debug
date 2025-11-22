@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -92,11 +93,11 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 	}
 
 	// Start callback server
-	config := &callbackServerConfig{
+	callbackConfig := &callbackServerConfig{
 		redirectURL: c.oauthConfig.RedirectURL,
 		logger:      c.logger,
 	}
-	server, resultChan, err := startCallbackServer(config)
+	server, resultChan, err := startCallbackServer(callbackConfig)
 	if err != nil {
 		return fmt.Errorf("failed to start callback server: %w", err)
 	}
@@ -136,9 +137,9 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 			return result.err
 		}
 	case <-timeoutCtx.Done():
-		if ctx.Err() != nil {
+		if errors.Is(ctx.Err(), context.Canceled) {
 			// Parent context was cancelled
-			return ctx.Err()
+			return fmt.Errorf("authorization cancelled: %w", ctx.Err())
 		}
 		// Timeout occurred
 		return fmt.Errorf("authorization timeout after %v", timeout)

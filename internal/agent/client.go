@@ -29,18 +29,27 @@ type Client struct {
 	version            string
 }
 
-// NewClient creates a new agent client
-func NewClient(endpoint, transport string, logger *Logger, oauthConfig *OAuthConfig, version string) *Client {
+// ClientConfig holds configuration for creating a new Client
+type ClientConfig struct {
+	Endpoint    string
+	Transport   string
+	Logger      *Logger
+	OAuthConfig *OAuthConfig
+	Version     string
+}
+
+// NewClient creates a new agent client from a configuration
+func NewClient(cfg ClientConfig) *Client {
 	return &Client{
-		endpoint:         endpoint,
-		transport:        transport,
-		logger:           logger,
+		endpoint:         cfg.Endpoint,
+		transport:        cfg.Transport,
+		logger:           cfg.Logger,
 		toolCache:        []mcp.Tool{},
 		resourceCache:    []mcp.Resource{},
 		promptCache:      []mcp.Prompt{},
 		notificationChan: make(chan mcp.JSONRPCNotification, 10),
-		oauthConfig:      oauthConfig,
-		version:          version,
+		oauthConfig:      cfg.OAuthConfig,
+		version:          cfg.Version,
 	}
 }
 
@@ -65,6 +74,9 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 
 	// Handle OAuth authentication if enabled
 	if c.oauthConfig != nil && c.oauthConfig.Enabled {
+		// Apply defaults before validation
+		c.oauthConfig = c.oauthConfig.WithDefaults()
+
 		if err := c.oauthConfig.Validate(); err != nil {
 			return fmt.Errorf("invalid OAuth configuration: %w", err)
 		}

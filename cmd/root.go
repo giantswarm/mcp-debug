@@ -168,6 +168,9 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 			UseOIDC:              oauthUseOIDC,
 		}
 
+		// Apply defaults for any unset fields
+		oauthConfig = oauthConfig.WithDefaults()
+
 		// Validate OAuth configuration
 		if err := oauthConfig.Validate(); err != nil {
 			return fmt.Errorf("invalid OAuth configuration: %w", err)
@@ -181,7 +184,13 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create and run agent client
-	client := agent.NewClient(endpoint, transport, logger, oauthConfig, version)
+	client := agent.NewClient(agent.ClientConfig{
+		Endpoint:    endpoint,
+		Transport:   transport,
+		Logger:      logger,
+		OAuthConfig: oauthConfig,
+		Version:     version,
+	})
 	if err := client.Run(ctx); err != nil {
 		return fmt.Errorf("failed to connect client: %w", err)
 	}

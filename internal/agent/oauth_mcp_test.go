@@ -536,6 +536,11 @@ func TestURLParsingSecurityEdgeCases(t *testing.T) {
 				Scopes:      []string{"mcp:tools"},
 			}
 
+			// Apply defaults for non-error cases to ensure all required fields are set
+			if !tt.wantErr {
+				config = config.WithDefaults()
+			}
+
 			err := config.Validate()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)

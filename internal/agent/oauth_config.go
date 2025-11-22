@@ -45,7 +45,29 @@ func DefaultOAuthConfig() *OAuthConfig {
 	}
 }
 
-// Validate checks if the OAuth configuration is valid
+// WithDefaults returns a new config with defaults applied for any unset fields
+func (c *OAuthConfig) WithDefaults() *OAuthConfig {
+	config := *c
+
+	// Set default scopes if none provided
+	if len(config.Scopes) == 0 {
+		config.Scopes = []string{"mcp:tools", "mcp:resources"}
+	}
+
+	// Set default timeout if not provided
+	if config.AuthorizationTimeout == 0 {
+		config.AuthorizationTimeout = 5 * time.Minute
+	}
+
+	// Set default redirect URL if not provided
+	if config.RedirectURL == "" {
+		config.RedirectURL = "http://localhost:8765/callback"
+	}
+
+	return &config
+}
+
+// Validate checks if the OAuth configuration is valid (read-only, does not modify config)
 func (c *OAuthConfig) Validate() error {
 	if !c.Enabled {
 		return nil
@@ -76,14 +98,14 @@ func (c *OAuthConfig) Validate() error {
 		return fmt.Errorf("redirect URI scheme must be http, got: %s (only http://localhost:PORT/callback is supported)", parsedURL.Scheme)
 	}
 
-	// Set default scopes if none provided
+	// Validate scopes are set (after defaults have been applied)
 	if len(c.Scopes) == 0 {
-		c.Scopes = []string{"mcp:tools", "mcp:resources"}
+		return fmt.Errorf("OAuth scopes are required")
 	}
 
-	// Set default timeout if not provided
+	// Validate timeout is set (after defaults have been applied)
 	if c.AuthorizationTimeout == 0 {
-		c.AuthorizationTimeout = 5 * time.Minute
+		return fmt.Errorf("OAuth authorization timeout is required")
 	}
 
 	return nil
