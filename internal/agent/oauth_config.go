@@ -3,6 +3,7 @@ package agent
 import (
 	"fmt"
 	"net/url"
+	"time"
 )
 
 // OAuthConfig contains OAuth 2.1 configuration for authenticating with MCP servers
@@ -24,15 +25,19 @@ type OAuthConfig struct {
 
 	// UsePKCE enables Proof Key for Code Exchange (recommended, enabled by default)
 	UsePKCE bool
+
+	// AuthorizationTimeout is the maximum time to wait for user authorization (default: 5 minutes)
+	AuthorizationTimeout time.Duration
 }
 
 // DefaultOAuthConfig returns a default OAuth configuration
 func DefaultOAuthConfig() *OAuthConfig {
 	return &OAuthConfig{
-		Enabled:     false,
-		Scopes:      []string{"mcp:tools", "mcp:resources"},
-		RedirectURL: "http://localhost:8765/callback",
-		UsePKCE:     true,
+		Enabled:              false,
+		Scopes:               []string{"mcp:tools", "mcp:resources"},
+		RedirectURL:          "http://localhost:8765/callback",
+		UsePKCE:              true,
+		AuthorizationTimeout: 5 * time.Minute,
 	}
 }
 
@@ -67,6 +72,11 @@ func (c *OAuthConfig) Validate() error {
 	// Set default scopes if none provided
 	if len(c.Scopes) == 0 {
 		c.Scopes = []string{"mcp:tools", "mcp:resources"}
+	}
+
+	// Set default timeout if not provided
+	if c.AuthorizationTimeout == 0 {
+		c.AuthorizationTimeout = 5 * time.Minute
 	}
 
 	return nil

@@ -175,7 +175,7 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create and run agent client
-	client := agent.NewClient(endpoint, transport, logger, oauthConfig)
+	client := agent.NewClient(endpoint, transport, logger, oauthConfig, version)
 	if err := client.Run(ctx); err != nil {
 		return fmt.Errorf("failed to connect client: %w", err)
 	}

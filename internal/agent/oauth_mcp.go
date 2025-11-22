@@ -20,7 +20,14 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 	// Check if client needs to be registered (Dynamic Client Registration)
 	if oauthHandler.GetClientID() == "" {
 		c.logger.Info("No client ID configured, attempting dynamic client registration...")
-		err := oauthHandler.RegisterClient(ctx, "mcp-debug")
+
+		// Use semantic version in client name
+		clientName := "mcp-debug"
+		if c.version != "" && c.version != "dev" {
+			clientName = fmt.Sprintf("mcp-debug/%s", c.version)
+		}
+
+		err := oauthHandler.RegisterClient(ctx, clientName)
 		if err != nil {
 			c.logger.Warning("Dynamic client registration failed: %v", err)
 			c.logger.Info("You may need to manually register a client and provide --oauth-client-id")
@@ -75,14 +82,26 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 		}
 
 		if params["error"] != "" {
-			errChan <- fmt.Errorf("authorization error: %s - %s", params["error"], params["error_description"])
+			select {
+			case errChan <- fmt.Errorf("authorization error: %s - %s", params["error"], params["error_description"]):
+			default:
+				// Channel already consumed, log and continue
+				c.logger.Warning("Error occurred but callback already processed")
+			}
 			http.Error(w, "Authorization failed", http.StatusBadRequest)
 			return
 		}
 
-		callbackChan <- params
+		select {
+		case callbackChan <- params:
+		default:
+			// Channel already consumed, log and continue
+			c.logger.Warning("Callback received but already processed")
+		}
 		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(`<html><body><h1>✅ Authorization Successful!</h1><p>You can close this window.</p></body></html>`))
+		if _, err := w.Write([]byte(`<html><body><h1>✅ Authorization Successful!</h1><p>You can close this window.</p></body></html>`)); err != nil {
+			c.logger.Warning("Failed to write response: %v", err)
+		}
 	})
 
 	// Create server with security timeouts
@@ -96,10 +115,21 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			errChan <- fmt.Errorf("callback server error: %w", err)
+			select {
+			case errChan <- fmt.Errorf("callback server error: %w", err):
+			default:
+				// Channel already consumed, log and continue
+				c.logger.Warning("Server error occurred but callback already processed")
+			}
 		}
 	}()
-	defer server.Shutdown(context.Background())
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			c.logger.Warning("Failed to shutdown callback server: %v", err)
+		}
+	}()
 
 	// Open browser
 	c.logger.Info("Opening browser for authorization...")
@@ -113,13 +143,19 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 	// Wait for callback
 	c.logger.Info("Waiting for authorization...")
 	var params map[string]string
+
+	timeout := c.oauthConfig.AuthorizationTimeout
+	if timeout == 0 {
+		timeout = 5 * time.Minute
+	}
+
 	select {
 	case params = <-callbackChan:
 		// Got callback
 	case err := <-errChan:
 		return err
-	case <-time.After(5 * time.Minute):
-		return fmt.Errorf("authorization timeout")
+	case <-time.After(timeout):
+		return fmt.Errorf("authorization timeout after %v", timeout)
 	case <-ctx.Done():
 		return ctx.Err()
 	}

@@ -26,10 +26,11 @@ type Client struct {
 	notificationChan   chan mcp.JSONRPCNotification
 	serverCapabilities *mcp.ServerCapabilities
 	oauthConfig        *OAuthConfig
+	version            string
 }
 
 // NewClient creates a new agent client
-func NewClient(endpoint, transport string, logger *Logger, oauthConfig *OAuthConfig) *Client {
+func NewClient(endpoint, transport string, logger *Logger, oauthConfig *OAuthConfig, version string) *Client {
 	return &Client{
 		endpoint:         endpoint,
 		transport:        transport,
@@ -39,6 +40,7 @@ func NewClient(endpoint, transport string, logger *Logger, oauthConfig *OAuthCon
 		promptCache:      []mcp.Prompt{},
 		notificationChan: make(chan mcp.JSONRPCNotification, 10),
 		oauthConfig:      oauthConfig,
+		version:          version,
 	}
 }
 
@@ -98,21 +100,11 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 
 	c.client = mcpClient
 
-	// Start the transport
-	if err := mcpClient.Start(ctx); err != nil {
-		// Check if OAuth authorization is required
-		if client.IsOAuthAuthorizationRequiredError(err) {
-			c.logger.Info("OAuth authorization required, starting authorization flow...")
-			if err := c.handleOAuthAuthorization(ctx, err); err != nil {
-				return fmt.Errorf("OAuth authorization failed: %w", err)
-			}
-			// Retry starting the client
-			if err := mcpClient.Start(ctx); err != nil {
-				return fmt.Errorf("failed to start client after authorization: %w", err)
-			}
-		} else {
-			return fmt.Errorf("failed to start client: %w", err)
-		}
+	// Start the transport with OAuth retry support
+	if err := c.executeWithOAuthRetry(ctx, "start client", func() error {
+		return mcpClient.Start(ctx)
+	}); err != nil {
+		return err
 	}
 
 	// Set up notification handler
@@ -123,21 +115,11 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 		}
 	})
 
-	// Initialize the session
-	if err := c.initialize(ctx); err != nil {
-		// Check if OAuth authorization is required
-		if client.IsOAuthAuthorizationRequiredError(err) {
-			c.logger.Info("OAuth authorization required during initialization, starting authorization flow...")
-			if err := c.handleOAuthAuthorization(ctx, err); err != nil {
-				return fmt.Errorf("OAuth authorization failed: %w", err)
-			}
-			// Retry initialization
-			if err := c.initialize(ctx); err != nil {
-				return fmt.Errorf("initialization failed after authorization: %w", err)
-			}
-		} else {
-			return fmt.Errorf("initialization failed: %w", err)
-		}
+	// Initialize the session with OAuth retry support
+	if err := c.executeWithOAuthRetry(ctx, "initialization", func() error {
+		return c.initialize(ctx)
+	}); err != nil {
+		return err
 	}
 
 	// List capabilities conditionally based on what the server supports
@@ -566,6 +548,29 @@ func (c *Client) handleOAuthAuthorization(ctx context.Context, authErr error) er
 
 	// Use our wrapper that provides better UX while leveraging mcp-go's OAuth handler
 	return c.handleMCPOAuthFlow(ctx, oauthHandler)
+}
+
+// executeWithOAuthRetry executes an operation with automatic OAuth authorization retry
+func (c *Client) executeWithOAuthRetry(ctx context.Context, operation string, fn func() error) error {
+	err := fn()
+	if err == nil {
+		return nil
+	}
+
+	// Check if OAuth authorization is required
+	if client.IsOAuthAuthorizationRequiredError(err) {
+		c.logger.Info("OAuth authorization required for %s, starting authorization flow...", operation)
+		if authErr := c.handleOAuthAuthorization(ctx, err); authErr != nil {
+			return fmt.Errorf("OAuth authorization failed: %w", authErr)
+		}
+		// Retry the operation
+		if retryErr := fn(); retryErr != nil {
+			return fmt.Errorf("%s failed after authorization: %w", operation, retryErr)
+		}
+		return nil
+	}
+
+	return fmt.Errorf("%s failed: %w", operation, err)
 }
 
 func shouldReconnect(err error) bool {
