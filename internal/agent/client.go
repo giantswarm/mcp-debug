@@ -90,6 +90,7 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 			return fmt.Errorf("failed to create OAuth client: %w", err)
 		}
 		c.logger.Success("OAuth client created")
+		c.logger.Info("Token refresh will be handled automatically by the OAuth client when tokens expire")
 	} else {
 		// Create regular non-OAuth client
 		mcpClient, err = client.NewStreamableHttpClient(c.endpoint)
@@ -557,12 +558,17 @@ func (c *Client) executeWithOAuthRetry(ctx context.Context, operation string, fn
 		return nil
 	}
 
-	// Check if OAuth authorization is required
+	// Check if OAuth authorization is required (might indicate token refresh is needed)
 	if client.IsOAuthAuthorizationRequiredError(err) {
 		c.logger.Info("OAuth authorization required for %s, starting authorization flow...", operation)
+		c.logger.Info("This may indicate token expiration - automatic refresh or re-authorization will be attempted")
+
 		if authErr := c.handleOAuthAuthorization(ctx, err); authErr != nil {
 			return fmt.Errorf("OAuth authorization failed: %w", authErr)
 		}
+
+		c.logger.Success("OAuth token refreshed/renewed successfully")
+
 		// Retry the operation
 		if retryErr := fn(); retryErr != nil {
 			return fmt.Errorf("%s failed after authorization: %w", operation, retryErr)

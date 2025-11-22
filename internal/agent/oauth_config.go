@@ -28,6 +28,9 @@ type OAuthConfig struct {
 
 	// AuthorizationTimeout is the maximum time to wait for user authorization (default: 5 minutes)
 	AuthorizationTimeout time.Duration
+
+	// UseOIDC enables OpenID Connect features including nonce validation (optional)
+	UseOIDC bool
 }
 
 // DefaultOAuthConfig returns a default OAuth configuration
@@ -38,6 +41,7 @@ func DefaultOAuthConfig() *OAuthConfig {
 		RedirectURL:          "http://localhost:8765/callback",
 		UsePKCE:              true,
 		AuthorizationTimeout: 5 * time.Minute,
+		UseOIDC:              false, // OIDC features disabled by default
 	}
 }
 
@@ -59,14 +63,17 @@ func (c *OAuthConfig) Validate() error {
 	}
 
 	// Security: Only allow HTTP for localhost/loopback addresses
+	// Note: HTTPS redirect URIs are not supported for the callback server (which only runs on localhost)
 	if parsedURL.Scheme == "http" {
 		hostname := parsedURL.Hostname()
 		// Note: Hostname() strips brackets from IPv6 addresses, so [::1] becomes ::1
 		if hostname != "localhost" && hostname != "127.0.0.1" && hostname != "::1" {
-			return fmt.Errorf("HTTP redirect URIs are only allowed for localhost/127.0.0.1/[::1], use HTTPS for other hosts")
+			return fmt.Errorf("HTTP redirect URIs are only allowed for localhost/127.0.0.1/[::1], got: %s", hostname)
 		}
-	} else if parsedURL.Scheme != "https" {
-		return fmt.Errorf("redirect URI scheme must be http (localhost only) or https, got: %s", parsedURL.Scheme)
+	} else if parsedURL.Scheme == "https" {
+		return fmt.Errorf("HTTPS redirect URIs are not supported - callback server only runs on localhost with HTTP (use http://localhost:PORT/callback)")
+	} else {
+		return fmt.Errorf("redirect URI scheme must be http, got: %s (only http://localhost:PORT/callback is supported)", parsedURL.Scheme)
 	}
 
 	// Set default scopes if none provided

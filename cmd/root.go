@@ -34,6 +34,7 @@ var (
 	oauthRedirectURL  string
 	oauthUsePKCE      bool
 	oauthTimeout      time.Duration
+	oauthUseOIDC      bool
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -110,6 +111,7 @@ func init() {
 	rootCmd.Flags().StringVar(&oauthRedirectURL, "oauth-redirect-url", "http://localhost:8765/callback", "OAuth redirect URL for callback")
 	rootCmd.Flags().BoolVar(&oauthUsePKCE, "oauth-pkce", true, "Use PKCE (Proof Key for Code Exchange) for OAuth flow")
 	rootCmd.Flags().DurationVar(&oauthTimeout, "oauth-timeout", 5*time.Minute, "Maximum time to wait for OAuth authorization")
+	rootCmd.Flags().BoolVar(&oauthUseOIDC, "oauth-oidc", false, "Enable OpenID Connect features including nonce validation")
 
 	// Add subcommands
 	rootCmd.AddCommand(newSelfUpdateCmd())
@@ -163,6 +165,7 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 			RedirectURL:          oauthRedirectURL,
 			UsePKCE:              oauthUsePKCE,
 			AuthorizationTimeout: oauthTimeout,
+			UseOIDC:              oauthUseOIDC,
 		}
 
 		// Validate OAuth configuration

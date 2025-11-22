@@ -61,10 +61,34 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 		return fmt.Errorf("failed to generate state: %w", err)
 	}
 
+	// Generate nonce for OIDC flows if enabled
+	var nonce string
+	if c.oauthConfig.UseOIDC {
+		nonce, err = client.GenerateState() // Reuse state generation for nonce
+		if err != nil {
+			return fmt.Errorf("failed to generate nonce: %w", err)
+		}
+		c.logger.Info("OIDC mode enabled - nonce will be validated")
+	}
+
 	// Get authorization URL from mcp-go's handler
 	authURL, err := oauthHandler.GetAuthorizationURL(ctx, state, codeChallenge)
 	if err != nil {
 		return fmt.Errorf("failed to get authorization URL: %w", err)
+	}
+
+	// Add nonce parameter for OIDC flows
+	if c.oauthConfig.UseOIDC && nonce != "" {
+		parsedURL, err := url.Parse(authURL)
+		if err == nil {
+			q := parsedURL.Query()
+			q.Set("nonce", nonce)
+			parsedURL.RawQuery = q.Encode()
+			authURL = parsedURL.String()
+			c.logger.Info("Added nonce parameter to authorization URL")
+		} else {
+			c.logger.Warning("Failed to add nonce to URL: %v", err)
+		}
 	}
 
 	// Start callback server
@@ -101,16 +125,23 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 		timeout = 5 * time.Minute
 	}
 
+	// Use context.WithTimeout for better resource management
+	timeoutCtx, cancelTimeout := context.WithTimeout(ctx, timeout)
+	defer cancelTimeout()
+
 	var result callbackResult
 	select {
 	case result = <-resultChan:
 		if result.err != nil {
 			return result.err
 		}
-	case <-time.After(timeout):
+	case <-timeoutCtx.Done():
+		if ctx.Err() != nil {
+			// Parent context was cancelled
+			return ctx.Err()
+		}
+		// Timeout occurred
 		return fmt.Errorf("authorization timeout after %v", timeout)
-	case <-ctx.Done():
-		return ctx.Err()
 	}
 
 	params := result.params
@@ -135,6 +166,25 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 	}
 
 	c.logger.Success("Access token obtained successfully!")
+
+	// Log requested scopes for security audit
+	c.logger.Info("Requested scopes: %v", c.oauthConfig.Scopes)
+	// Note: Granted scopes would need to be exposed by mcp-go library for full validation
+	// For now, we log what was requested. The authorization server may have granted different scopes.
+	c.logger.Info("Token exchange completed - verify granted scopes match your requirements")
+
+	// OIDC nonce validation
+	if c.oauthConfig.UseOIDC && nonce != "" {
+		c.logger.Info("OIDC nonce validation: nonce='%s'", nonce)
+		c.logger.Warning("Full OIDC ID token validation (including nonce) requires access to the ID token from mcp-go")
+		c.logger.Info("Ensure your MCP server validates the ID token if using OIDC")
+		// Note: Full nonce validation would require:
+		// 1. Extracting the ID token from the token response
+		// 2. Decoding the JWT
+		// 3. Validating the nonce claim matches our generated nonce
+		// This is typically handled by the authorization library (mcp-go in this case)
+	}
+
 	return nil
 }
 

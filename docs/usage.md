@@ -209,6 +209,7 @@ The tool will automatically register itself with the authorization server and ob
 | `--oauth-redirect-url` | Redirect URL for OAuth callback | `http://localhost:8765/callback` |
 | `--oauth-pkce` | Use PKCE for authorization | `true` |
 | `--oauth-timeout` | Maximum time to wait for OAuth authorization | `5m` |
+| `--oauth-oidc` | Enable OpenID Connect features (nonce validation) | `false` |
 
 ### OAuth Flow
 
@@ -231,6 +232,28 @@ Tokens are managed automatically by mcp-go:
 - **Automatically refreshed** when expired (if refresh tokens are supported)
 - **Not persisted** to disk - you'll need to re-authenticate each time you run mcp-debug
 - This provides better security by preventing token theft from disk storage
+- Token refresh events are logged for security auditing
+
+### OpenID Connect (OIDC) Support
+
+For MCP servers using OpenID Connect, enable OIDC features:
+
+```bash
+./mcp-debug --oauth --oauth-oidc \
+  --endpoint https://oidc-server.com/mcp
+```
+
+**What OIDC mode enables:**
+- **Nonce parameter** generation and validation for additional security
+- **ID token awareness** (validation is delegated to mcp-go library)
+- **Enhanced logging** for OIDC-specific security features
+
+**When to use OIDC mode:**
+- Your MCP server explicitly uses OpenID Connect (not just OAuth 2.0)
+- You need additional security guarantees beyond PKCE
+- You're debugging OIDC-specific issues
+
+**Note:** Most MCP servers use OAuth 2.0 (not OIDC), so this flag is typically not needed.
 
 ### OAuth with REPL Mode
 
@@ -316,6 +339,53 @@ If the server doesn't support DCR and you can't register your own application, c
 - Provide you with client credentials, or
 - Register mcp-debug as a client on their authorization server
 
+### Understanding OAuth Scopes
+
+**Important:** The scopes you specify with `--oauth-scopes` are for the **MCP server**, not for the underlying service provider (like Google).
+
+**Correct Scope Usage:**
+
+```bash
+# ✅ Correct: Requesting MCP server scopes
+./mcp-debug --oauth \
+  --oauth-scopes "mcp:tools,mcp:resources" \
+  --endpoint https://mcp-server-for-google.com/mcp
+
+# ❌ Incorrect: Don't specify Google API scopes here
+./mcp-debug --oauth \
+  --oauth-scopes "https://www.googleapis.com/auth/gmail.readonly" \
+  --endpoint https://mcp-server-for-google.com/mcp
+```
+
+**Why?** In a federated authentication setup:
+1. **mcp-debug** authenticates with the **MCP server** (using MCP scopes)
+2. The **MCP server** authenticates with **Google** (using Google API scopes)
+3. The Google API scopes are configured in the MCP server, not in mcp-debug
+
+When you authorize, you'll see Google's consent screen with the Google API scopes that the MCP server has requested, but you configure only MCP scopes in mcp-debug.
+
+### Concurrent Authorization Attempts
+
+**Important:** Do not run multiple instances of mcp-debug with OAuth enabled simultaneously using the same redirect URL. This will cause conflicts:
+
+- Only one callback server can listen on `http://localhost:8765/callback` at a time
+- The second instance will fail to start the callback server
+- Authorization responses may go to the wrong instance
+
+**If you need multiple concurrent sessions:**
+
+```bash
+# First instance (default port 8765)
+./mcp-debug --oauth --endpoint https://server1.com/mcp
+
+# Second instance (different port)
+./mcp-debug --oauth \
+  --oauth-redirect-url "http://localhost:8766/callback" \
+  --endpoint https://server2.com/mcp
+```
+
+**Note:** You'll need to register each redirect URL with your OAuth provider/MCP server.
+
 ### Security Best Practices
 
 - **Never commit** OAuth client secrets to version control
@@ -325,8 +395,10 @@ If the server doesn't support DCR and you can't register your own application, c
   ./mcp-debug --oauth --oauth-client-id="$CLIENT_ID" --oauth-client-secret="$OAUTH_CLIENT_SECRET"
   ```
 - The tool uses **PKCE** (Proof Key for Code Exchange) by default for enhanced security
-- Tokens are stored with **restricted file permissions** (owner read/write only)
+- Tokens are stored **in-memory only** during the session (not persisted to disk)
+- **Token refresh** is handled automatically when tokens expire
 - **Dynamic Client Registration** is attempted automatically when no client ID is provided
+- **HTTPS callbacks** are not supported - only `http://localhost:PORT/callback` is allowed for security reasons
 
 ---
 

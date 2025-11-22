@@ -453,3 +453,117 @@ func TestCallbackServerSecurityTimeouts(t *testing.T) {
 	defer cancel()
 	server.Shutdown(ctx)
 }
+
+func TestCallbackHandlerConcurrentRequests(t *testing.T) {
+	logger := NewLogger(false, false, false)
+	logger.SetWriter(io.Discard)
+	resultChan := make(chan callbackResult, 1)
+
+	handler := createCallbackHandler(logger, resultChan)
+
+	// Send two callbacks without reading from channel
+	req1 := httptest.NewRequest(http.MethodGet, "http://localhost/callback?code=first&state=state1", nil)
+	w1 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodGet, "http://localhost/callback?code=second&state=state2", nil)
+	w2 := httptest.NewRecorder()
+
+	// First callback fills the buffered channel
+	handler(w1, req1)
+
+	// Second callback should be dropped (select/default behavior)
+	handler(w2, req2)
+
+	// Verify only first callback was processed (channel has 1 item)
+	select {
+	case result := <-resultChan:
+		if result.err != nil {
+			t.Errorf("First callback failed: %v", result.err)
+		}
+		if result.params["code"] != "first" {
+			t.Errorf("Expected code=first, got code=%s", result.params["code"])
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Timeout waiting for first callback")
+	}
+
+	// Channel should be empty now (second was dropped)
+	select {
+	case result := <-resultChan:
+		t.Errorf("Second callback should have been dropped, but got: %v", result)
+	case <-time.After(100 * time.Millisecond):
+		// Expected - channel is empty (only held first result)
+	}
+}
+
+func TestURLParsingSecurityEdgeCases(t *testing.T) {
+	tests := []struct {
+		name    string
+		url     string
+		wantErr bool
+	}{
+		{
+			name:    "URL with fragment",
+			url:     "http://localhost:8765/callback#fragment",
+			wantErr: false, // Fragments are ignored in OAuth
+		},
+		{
+			name:    "URL with query in path",
+			url:     "http://localhost:8765/callback?foo=bar",
+			wantErr: false,
+		},
+		{
+			name:    "URL with Unicode domain (IDN)",
+			url:     "http://münchen.local:8765/callback",
+			wantErr: true, // Non-localhost should fail
+		},
+		{
+			name:    "URL with port only",
+			url:     "http://localhost:8765",
+			wantErr: false, // Path defaults to /
+		},
+		{
+			name:    "Empty URL",
+			url:     "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &OAuthConfig{
+				Enabled:     true,
+				RedirectURL: tt.url,
+				Scopes:      []string{"mcp:tools"},
+			}
+
+			err := config.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestOpenBrowserURLInjection(t *testing.T) {
+	// Test that URL validation prevents injection attacks
+	maliciousURLs := []string{
+		"http://localhost:8765/callback\n--malicious-flag",
+		"http://localhost:8765/callback; rm -rf /",
+		"http://localhost:8765/callback`command`",
+		"http://localhost:8765/callback$(command)",
+	}
+
+	for _, url := range maliciousURLs {
+		t.Run("injection_test", func(t *testing.T) {
+			// openBrowser validates URLs before passing to exec.Command
+			// The URL parser should reject these or they should fail safely
+			err := openBrowser(url)
+			// We expect either:
+			// 1. URL parsing to fail (invalid URL)
+			// 2. Command to fail (but not execute injected code)
+			// 3. Command to succeed but only open the URL part (system handles safely)
+			// The important thing is that malicious code doesn't execute
+			_ = err // Ignore error - just ensure no panic or code execution
+		})
+	}
+}

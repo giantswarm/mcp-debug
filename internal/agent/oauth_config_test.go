@@ -89,13 +89,22 @@ func TestOAuthConfig_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "https redirect is allowed for any host",
+			name: "https redirect is rejected (not supported)",
 			config: &OAuthConfig{
 				Enabled:     true,
 				RedirectURL: "https://example.com/callback",
 				Scopes:      []string{"mcp:tools"},
 			},
-			wantErr: false,
+			wantErr: true,
+		},
+		{
+			name: "https redirect for localhost is also rejected",
+			config: &OAuthConfig{
+				Enabled:     true,
+				RedirectURL: "https://localhost:8765/callback",
+				Scopes:      []string{"mcp:tools"},
+			},
+			wantErr: true,
 		},
 		{
 			name: "invalid redirect URL scheme",
@@ -153,6 +162,10 @@ func TestDefaultOAuthConfig(t *testing.T) {
 	if len(config.Scopes) == 0 {
 		t.Error("Default config should have default scopes")
 	}
+
+	if config.UseOIDC {
+		t.Error("Default config should have UseOIDC = false")
+	}
 }
 
 func TestOAuthConfig_FieldValues(t *testing.T) {
@@ -163,6 +176,7 @@ func TestOAuthConfig_FieldValues(t *testing.T) {
 		Scopes:       []string{"scope1", "scope2"},
 		RedirectURL:  "http://localhost:9999/callback",
 		UsePKCE:      false,
+		UseOIDC:      true,
 	}
 
 	if config.ClientID != "test-id" {
@@ -184,4 +198,121 @@ func TestOAuthConfig_FieldValues(t *testing.T) {
 	if config.UsePKCE {
 		t.Errorf("UsePKCE = %v, want false", config.UsePKCE)
 	}
+
+	if !config.UseOIDC {
+		t.Errorf("UseOIDC = %v, want true", config.UseOIDC)
+	}
+}
+
+func TestOAuthConfig_HTTPSValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		redirectURL string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "HTTPS localhost rejected",
+			redirectURL: "https://localhost:8765/callback",
+			wantErr:     true,
+			errContains: "HTTPS redirect URIs are not supported",
+		},
+		{
+			name:        "HTTPS 127.0.0.1 rejected",
+			redirectURL: "https://127.0.0.1:8765/callback",
+			wantErr:     true,
+			errContains: "HTTPS redirect URIs are not supported",
+		},
+		{
+			name:        "HTTPS external rejected",
+			redirectURL: "https://example.com/callback",
+			wantErr:     true,
+			errContains: "HTTPS redirect URIs are not supported",
+		},
+		{
+			name:        "HTTP localhost allowed",
+			redirectURL: "http://localhost:8765/callback",
+			wantErr:     false,
+		},
+		{
+			name:        "HTTP 127.0.0.1 allowed",
+			redirectURL: "http://127.0.0.1:8765/callback",
+			wantErr:     false,
+		},
+		{
+			name:        "HTTP IPv6 loopback allowed",
+			redirectURL: "http://[::1]:8765/callback",
+			wantErr:     false,
+		},
+		{
+			name:        "HTTP non-localhost rejected",
+			redirectURL: "http://example.com/callback",
+			wantErr:     true,
+			errContains: "HTTP redirect URIs are only allowed for localhost",
+		},
+		{
+			name:        "FTP scheme rejected",
+			redirectURL: "ftp://localhost/callback",
+			wantErr:     true,
+			errContains: "redirect URI scheme must be http",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &OAuthConfig{
+				Enabled:     true,
+				RedirectURL: tt.redirectURL,
+				Scopes:      []string{"mcp:tools"},
+			}
+
+			err := config.Validate()
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("Expected error but got nil")
+					return
+				}
+				if tt.errContains != "" && !contains(err.Error(), tt.errContains) {
+					t.Errorf("Error %q does not contain %q", err.Error(), tt.errContains)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestOAuthConfig_OIDCFeatures(t *testing.T) {
+	config := &OAuthConfig{
+		Enabled:     true,
+		RedirectURL: "http://localhost:8765/callback",
+		UseOIDC:     true,
+	}
+
+	err := config.Validate()
+	if err != nil {
+		t.Errorf("Validation failed for OIDC config: %v", err)
+	}
+
+	if !config.UseOIDC {
+		t.Error("Expected UseOIDC to be true")
+	}
+}
+
+// Helper function for substring checking
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > 0 && len(substr) > 0 && indexOf(s, substr) >= 0))
+}
+
+func indexOf(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
 }
