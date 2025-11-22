@@ -96,6 +96,12 @@ func (l *Logger) Success(format string, args ...interface{}) {
 	fmt.Fprintf(l.writer, "[%s] %s\n", l.timestamp(), l.colorize(msg, colorGreen))
 }
 
+// Warning logs a warning message
+func (l *Logger) Warning(format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	fmt.Fprintf(l.writer, "[%s] %s\n", l.timestamp(), l.colorize(msg, colorYellow))
+}
+
 // Request logs an outgoing request
 func (l *Logger) Request(method string, params interface{}) {
 	if !l.jsonRPCMode {

@@ -6,7 +6,7 @@ import (
 
 func TestServerCapabilityChecking(t *testing.T) {
 	logger := NewLogger(false, false, false)
-	client := NewClient("test://endpoint", "streamable-http", logger)
+	client := NewClient("test://endpoint", "streamable-http", logger, nil)
 
 	// Test with no capabilities set (should all return false)
 	if client.ServerSupportsTools() {
@@ -29,7 +29,7 @@ func TestServerCapabilityChecking(t *testing.T) {
 
 func TestNewClient(t *testing.T) {
 	logger := NewLogger(false, false, false)
-	client := NewClient("http://localhost:8080", "streamable-http", logger)
+	client := NewClient("http://localhost:8080", "streamable-http", logger, nil)
 
 	if client == nil {
 		t.Error("Expected client to be created, but got nil")

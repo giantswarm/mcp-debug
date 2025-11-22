@@ -25,10 +25,11 @@ type Client struct {
 	mu                 sync.RWMutex
 	notificationChan   chan mcp.JSONRPCNotification
 	serverCapabilities *mcp.ServerCapabilities
+	oauthConfig        *OAuthConfig
 }
 
 // NewClient creates a new agent client
-func NewClient(endpoint, transport string, logger *Logger) *Client {
+func NewClient(endpoint, transport string, logger *Logger, oauthConfig *OAuthConfig) *Client {
 	return &Client{
 		endpoint:         endpoint,
 		transport:        transport,
@@ -37,6 +38,7 @@ func NewClient(endpoint, transport string, logger *Logger) *Client {
 		resourceCache:    []mcp.Resource{},
 		promptCache:      []mcp.Prompt{},
 		notificationChan: make(chan mcp.JSONRPCNotification, 10),
+		oauthConfig:      oauthConfig,
 	}
 }
 
@@ -59,25 +61,58 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 	var mcpClient *client.Client
 	var err error
 
-	switch c.transport {
-	case "sse":
-		mcpClient, err = client.NewSSEMCPClient(c.endpoint)
-		if err != nil {
-			return fmt.Errorf("failed to create SSE client: %w", err)
+	// Handle OAuth authentication if enabled
+	if c.oauthConfig != nil && c.oauthConfig.Enabled {
+		if err := c.oauthConfig.Validate(); err != nil {
+			return fmt.Errorf("invalid OAuth configuration: %w", err)
 		}
-	case "streamable-http":
+
+		c.logger.Info("OAuth authentication enabled")
+
+		// Create token store for mcp-go
+		tokenStore := client.NewMemoryTokenStore()
+
+		// Create mcp-go OAuth config
+		mcpOAuthConfig := client.OAuthConfig{
+			ClientID:     c.oauthConfig.ClientID,
+			ClientSecret: c.oauthConfig.ClientSecret,
+			RedirectURI:  c.oauthConfig.RedirectURL,
+			Scopes:       c.oauthConfig.Scopes,
+			TokenStore:   tokenStore,
+			PKCEEnabled:  c.oauthConfig.UsePKCE,
+		}
+
+		// Create OAuth client using mcp-go's native support
+		mcpClient, err = client.NewOAuthStreamableHttpClient(c.endpoint, mcpOAuthConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create OAuth client: %w", err)
+		}
+		c.logger.Success("OAuth client created")
+	} else {
+		// Create regular non-OAuth client
 		mcpClient, err = client.NewStreamableHttpClient(c.endpoint)
 		if err != nil {
 			return fmt.Errorf("failed to create streamable HTTP client: %w", err)
 		}
-	default:
-		return fmt.Errorf("unsupported transport: %s", c.transport)
 	}
+
 	c.client = mcpClient
 
 	// Start the transport
 	if err := mcpClient.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start client: %w", err)
+		// Check if OAuth authorization is required
+		if client.IsOAuthAuthorizationRequiredError(err) {
+			c.logger.Info("OAuth authorization required, starting authorization flow...")
+			if err := c.handleOAuthAuthorization(ctx, err); err != nil {
+				return fmt.Errorf("OAuth authorization failed: %w", err)
+			}
+			// Retry starting the client
+			if err := mcpClient.Start(ctx); err != nil {
+				return fmt.Errorf("failed to start client after authorization: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to start client: %w", err)
+		}
 	}
 
 	// Set up notification handler
@@ -90,7 +125,19 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 
 	// Initialize the session
 	if err := c.initialize(ctx); err != nil {
-		return fmt.Errorf("initialization failed: %w", err)
+		// Check if OAuth authorization is required
+		if client.IsOAuthAuthorizationRequiredError(err) {
+			c.logger.Info("OAuth authorization required during initialization, starting authorization flow...")
+			if err := c.handleOAuthAuthorization(ctx, err); err != nil {
+				return fmt.Errorf("OAuth authorization failed: %w", err)
+			}
+			// Retry initialization
+			if err := c.initialize(ctx); err != nil {
+				return fmt.Errorf("initialization failed after authorization: %w", err)
+			}
+		} else {
+			return fmt.Errorf("initialization failed: %w", err)
+		}
 	}
 
 	// List capabilities conditionally based on what the server supports
@@ -507,6 +554,18 @@ func (c *Client) ServerSupportsPrompts() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.serverCapabilities != nil && c.serverCapabilities.Prompts != nil
+}
+
+// handleOAuthAuthorization handles the OAuth authorization flow using mcp-go's built-in support
+func (c *Client) handleOAuthAuthorization(ctx context.Context, authErr error) error {
+	// Get the OAuth handler from mcp-go's error
+	oauthHandler := client.GetOAuthHandler(authErr)
+	if oauthHandler == nil {
+		return fmt.Errorf("no OAuth handler available in error")
+	}
+
+	// Use our wrapper that provides better UX while leveraging mcp-go's OAuth handler
+	return c.handleMCPOAuthFlow(ctx, oauthHandler)
 }
 
 func shouldReconnect(err error) bool {

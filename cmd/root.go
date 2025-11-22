@@ -25,6 +25,14 @@ var (
 	transport       string
 	serverTransport string
 	listenAddr      string
+
+	// OAuth flags
+	oauthEnabled      bool
+	oauthClientID     string
+	oauthClientSecret string
+	oauthScopes       []string
+	oauthRedirectURL  string
+	oauthUsePKCE      bool
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -33,7 +41,7 @@ var rootCmd = &cobra.Command{
 	Short: "MCP debugging tool",
 	Long: `mcp-debug is a tool for debugging MCP (Model Context Protocol) servers.
 
-It provides an agent that can connect to MCP servers via SSE (Server-Sent Events),
+It provides an agent that can connect to MCP servers via streamable-http transport,
 inspect available tools, resources, and prompts, and execute them interactively.
 
 The tool supports multiple modes:
@@ -82,8 +90,8 @@ func SetVersion(v string) {
 
 func init() {
 	// Add flags
-	rootCmd.Flags().StringVar(&endpoint, "endpoint", "http://localhost:8090/mcp", "MCP endpoint URL (must end with /mcp for streamable-http)")
-	rootCmd.Flags().StringVar(&transport, "transport", "streamable-http", "Transport protocol to use for client connections (streamable-http, sse)")
+	rootCmd.Flags().StringVar(&endpoint, "endpoint", "http://localhost:8090/mcp", "MCP endpoint URL (must end with /mcp)")
+	rootCmd.Flags().StringVar(&transport, "transport", "streamable-http", "Transport protocol to use for client connections (streamable-http only)")
 	rootCmd.Flags().StringVar(&serverTransport, "server-transport", "stdio", "Transport protocol for the MCP server itself (stdio, streamable-http)")
 	rootCmd.Flags().StringVar(&listenAddr, "listen-addr", ":8899", "Listen address for streamable-http server (path is fixed to /mcp)")
 	rootCmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Timeout for waiting for notifications")
@@ -93,6 +101,14 @@ func init() {
 	rootCmd.Flags().BoolVar(&repl, "repl", false, "Start interactive REPL mode")
 	rootCmd.Flags().BoolVar(&mcpServer, "mcp-server", false, "Run as MCP server (stdio transport)")
 
+	// OAuth flags
+	rootCmd.Flags().BoolVar(&oauthEnabled, "oauth", false, "Enable OAuth authentication for connecting to protected MCP servers")
+	rootCmd.Flags().StringVar(&oauthClientID, "oauth-client-id", "", "OAuth client ID (optional - will use Dynamic Client Registration if not provided)")
+	rootCmd.Flags().StringVar(&oauthClientSecret, "oauth-client-secret", "", "OAuth client secret (optional)")
+	rootCmd.Flags().StringSliceVar(&oauthScopes, "oauth-scopes", []string{"mcp:tools", "mcp:resources"}, "OAuth scopes to request")
+	rootCmd.Flags().StringVar(&oauthRedirectURL, "oauth-redirect-url", "http://localhost:8765/callback", "OAuth redirect URL for callback")
+	rootCmd.Flags().BoolVar(&oauthUsePKCE, "oauth-pkce", true, "Use PKCE (Proof Key for Code Exchange) for OAuth flow")
+
 	// Add subcommands
 	rootCmd.AddCommand(newSelfUpdateCmd())
 
@@ -101,23 +117,13 @@ func init() {
 }
 
 func runMCPDebug(cmd *cobra.Command, args []string) error {
-	// Validate transport and endpoint combination
-	isSSEEndpoint := strings.HasSuffix(endpoint, "/sse")
-	isSSETransport := transport == "sse"
-
-	isStreamableHTTPEndpoint := strings.HasSuffix(endpoint, "/mcp")
-	isStreamableHTTPTransport := transport == "streamable-http"
-
-	if isSSETransport && !isSSEEndpoint {
-		return fmt.Errorf("transport is 'sse' but endpoint '%s' does not end with /sse", endpoint)
+	// Validate endpoint for streamable-http
+	if transport == "streamable-http" && !strings.HasSuffix(endpoint, "/mcp") {
+		return fmt.Errorf("endpoint '%s' must end with /mcp for streamable-http transport", endpoint)
 	}
 
-	if isStreamableHTTPTransport && !isStreamableHTTPEndpoint {
-		return fmt.Errorf("transport is 'streamable-http' but endpoint '%s' does not end with /mcp", endpoint)
-	}
-
-	if isSSEEndpoint && !isSSETransport {
-		return fmt.Errorf("endpoint '%s' looks like an SSE endpoint, but transport is '%s'. Please use --transport=sse", endpoint, transport)
+	if transport != "streamable-http" {
+		return fmt.Errorf("unsupported transport '%s' (only streamable-http is supported)", transport)
 	}
 
 	// Create context with signal handling
@@ -138,8 +144,32 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 	// Create logger
 	logger := agent.NewLogger(verbose, !noColor, jsonRPC)
 
+	// Create OAuth config if enabled
+	var oauthConfig *agent.OAuthConfig
+	if oauthEnabled {
+		oauthConfig = &agent.OAuthConfig{
+			Enabled:      true,
+			ClientID:     oauthClientID,
+			ClientSecret: oauthClientSecret,
+			Scopes:       oauthScopes,
+			RedirectURL:  oauthRedirectURL,
+			UsePKCE:      oauthUsePKCE,
+		}
+
+		// Validate OAuth configuration
+		if err := oauthConfig.Validate(); err != nil {
+			return fmt.Errorf("invalid OAuth configuration: %w", err)
+		}
+
+		if oauthClientID == "" {
+			logger.Info("OAuth enabled - will attempt Dynamic Client Registration")
+		} else {
+			logger.Info("OAuth enabled with client ID: %s", oauthClientID)
+		}
+	}
+
 	// Create and run agent client
-	client := agent.NewClient(endpoint, transport, logger)
+	client := agent.NewClient(endpoint, transport, logger, oauthConfig)
 	if err := client.Run(ctx); err != nil {
 		return fmt.Errorf("failed to connect client: %w", err)
 	}

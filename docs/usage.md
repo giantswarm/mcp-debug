@@ -162,13 +162,137 @@ You would then configure your AI assistant to connect to `http://localhost:9000/
 
 ## Transport Protocols
 
-`mcp-debug` supports multiple transport protocols for communication:
+`mcp-debug` supports the `streamable-http` transport protocol for communication with MCP servers. This is a modern, efficient protocol designed for MCP communication.
 
-- **`streamable-http`** (Default): A modern, efficient protocol for MCP communication.
-- **`sse`**: Server-Sent Events, a common protocol for streaming updates.
-- **`stdio`**: Uses standard input/output for communication, primarily for the MCP Server mode.
+For the MCP Server mode, you can choose between:
+- **`stdio`** (Default): Uses standard input/output for communication, ideal for local AI assistant integration.
+- **`streamable-http`**: Network-based transport for remote connections.
 
-You can specify the transport using the `--transport` and `--server-transport` flags.
+You can specify the server transport using the `--server-transport` flag.
+
+---
+
+## OAuth Authentication
+
+`mcp-debug` supports OAuth 2.1 authentication for connecting to protected MCP servers. This allows you to debug servers that require user authorization.
+
+### Basic OAuth Usage
+
+**With Pre-Registered Client Credentials:**
+
+```bash
+./mcp-debug --oauth \
+  --oauth-client-id your-client-id \
+  --oauth-client-secret your-client-secret \
+  --endpoint https://protected.server.com/mcp
+```
+
+**With Dynamic Client Registration (DCR):**
+
+If the MCP server supports Dynamic Client Registration (RFC 7591), you can connect without pre-registered credentials:
+
+```bash
+./mcp-debug --oauth \
+  --endpoint https://protected.server.com/mcp
+```
+
+The tool will automatically register itself with the authorization server and obtain a client ID.
+
+### OAuth Flags
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--oauth` | Enable OAuth authentication | `false` |
+| `--oauth-client-id` | OAuth client ID (optional - uses DCR if not provided) | |
+| `--oauth-client-secret` | OAuth client secret (optional) | |
+| `--oauth-scopes` | OAuth scopes to request (comma-separated) | `mcp:tools,mcp:resources` |
+| `--oauth-redirect-url` | Redirect URL for OAuth callback | `http://localhost:8765/callback` |
+| `--oauth-pkce` | Use PKCE for authorization | `true` |
+
+### OAuth Flow
+
+When you run `mcp-debug` with OAuth enabled:
+
+1. **mcp-debug** attempts to connect to the server
+2. If OAuth endpoints are not provided, they are auto-discovered via server metadata
+3. A local callback server starts on your machine (default: port 8765)
+4. Your default browser opens to the authorization page
+5. You log in and grant permissions
+6. The authorization server redirects back to mcp-debug
+7. **mcp-debug** exchanges the authorization code for an access token
+8. Tokens are stored securely at `~/.mcp-debug/tokens.json`
+9. The connection proceeds with authenticated requests
+
+### Token Management
+
+Tokens are managed automatically by mcp-go:
+
+- **Stored in memory** during the session
+- **Automatically refreshed** when expired
+- **Not persisted** to disk (re-authorization required per session)
+
+### OAuth with REPL Mode
+
+```bash
+./mcp-debug --repl --oauth \
+  --oauth-client-id my-client-id \
+  --oauth-client-secret my-secret \
+  --endpoint https://api.example.com/mcp
+```
+
+Once authenticated, you can use all REPL commands normally. The token is automatically included in all requests.
+
+### Connecting to Servers with Google OAuth (or other providers)
+
+If your MCP server uses Google OAuth or another OAuth provider but you don't have client credentials, you have three options:
+
+**Option 1: Dynamic Client Registration (Recommended)**
+
+Try connecting without credentials to see if the server supports DCR:
+
+```bash
+./mcp-debug --oauth --endpoint https://your-server.com/mcp
+```
+
+If the server supports RFC 7591 Dynamic Client Registration, mcp-debug will automatically register and obtain credentials.
+
+**Option 2: Register Your Own OAuth Application**
+
+For Google OAuth:
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the required APIs
+4. Go to "Credentials" → "Create Credentials" → "OAuth 2.0 Client ID"
+5. Set application type to "Web application"
+6. Add redirect URI: `http://localhost:8765/callback`
+7. Copy the Client ID and Client Secret
+
+Then use mcp-debug:
+
+```bash
+./mcp-debug --oauth \
+  --oauth-client-id YOUR_GOOGLE_CLIENT_ID \
+  --oauth-client-secret YOUR_GOOGLE_CLIENT_SECRET \
+  --endpoint https://your-server.com/mcp
+```
+
+**Option 3: Contact Server Administrator**
+
+If the server doesn't support DCR and you can't register your own application, contact the server administrator to:
+- Provide you with client credentials, or
+- Register mcp-debug as a client on their authorization server
+
+### Security Best Practices
+
+- **Never commit** OAuth client secrets to version control
+- Use **environment variables** for sensitive credentials:
+  ```bash
+  export OAUTH_CLIENT_SECRET="your-secret"
+  ./mcp-debug --oauth --oauth-client-id="$CLIENT_ID" --oauth-client-secret="$OAUTH_CLIENT_SECRET"
+  ```
+- The tool uses **PKCE** (Proof Key for Code Exchange) by default for enhanced security
+- Tokens are stored with **restricted file permissions** (owner read/write only)
+- **Dynamic Client Registration** is attempted automatically when no client ID is provided
 
 ---
 
@@ -181,7 +305,7 @@ Here are the most important flags to configure `mcp-debug`:
 | `--repl`            | Start the interactive REPL mode.                                                     | `false`                        |
 | `--mcp-server`      | Run as an MCP server.                                                                | `false`                        |
 | `--endpoint`        | The URL of the target MCP server.                                                    | `http://localhost:8090/mcp`    |
-| `--transport`       | Client transport protocol (`streamable-http`, `sse`).                                | `streamable-http`              |
+| `--transport`       | Client transport protocol (`streamable-http` only).                                  | `streamable-http`              |
 | `--server-transport`| Server transport protocol (`stdio`, `streamable-http`).                                | `stdio`                        |
 | `--listen-addr`     | Listen address for the `streamable-http` server.                                     | `:8899`                        |
 | `--timeout`         | Timeout for waiting for notifications in normal mode.                                | `5m`                           |
@@ -243,9 +367,9 @@ For other shells like `fish` or `powershell`, you can get specific instructions 
 ./mcp-debug --endpoint http://custom.server:1234/mcp --timeout 10s
 ```
 
-**Connect to an SSE server and log all JSON-RPC traffic:**
+**Connect with verbose logging and full JSON-RPC traffic:**
 ```bash
-./mcp-debug --endpoint http://legacy.server/sse --transport sse --json-rpc
+./mcp-debug --endpoint http://server.example.com/mcp --verbose --json-rpc
 ```
 
 ### Using the REPL
