@@ -28,7 +28,8 @@
             ],
             "env": {
                 "OAUTH_REGISTRATION_TOKEN": "your-registration-token-here"
-            }
+            },
+            "_comment": "Security: Registration tokens are sensitive credentials. Store them in environment variables, never commit to version control. Tokens are only transmitted over HTTPS and only to validated registration endpoints."
         }
     }
 } 

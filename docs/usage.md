@@ -219,7 +219,29 @@ Some authorization servers require a registration access token for DCR (per RFC 
   --endpoint https://protected.server.com/mcp
 ```
 
+**Security Considerations for Registration Tokens:**
+
+The registration access token is a sensitive credential that must be protected:
+
+1. **HTTPS Required**: The token will ONLY be transmitted over HTTPS connections. Attempts to use HTTP will fail with a security error.
+2. **Endpoint Validation**: The token is only injected into recognized OAuth registration endpoints (e.g., `/oauth/register`, `/oauth2/registration`) to prevent token leakage.
+3. **Storage**: Store registration tokens in environment variables or secure vaults, never commit them to version control.
+4. **Token Lifecycle**: 
+   - Obtain tokens from your authorization server administrator
+   - Tokens may have expiration times - check with your administrator
+   - Rotate tokens regularly as part of security best practices
+5. **Monitoring**: DCR requests are logged for audit purposes
+
 The registration token is provided as a Bearer token in the Authorization header during the client registration request. Contact your authorization server administrator to obtain a registration access token if DCR authentication is enabled.
+
+**Token Rotation:**
+
+If you need to rotate your registration token:
+
+1. Obtain a new token from your authorization server administrator
+2. Update your environment variable or command-line flag
+3. The old token will no longer be used on the next connection
+4. Invalidate the old token with your authorization server if possible
 
 ### OAuth Flags
 
@@ -354,6 +376,20 @@ You need to provide a registration access token:
 ```
 
 Contact your server administrator to obtain a registration access token.
+
+**Security Errors:**
+
+If you encounter security-related errors:
+
+1. **"security: registration token can only be sent over HTTPS"**
+   - The endpoint URL must use `https://` scheme
+   - Registration tokens are sensitive credentials and will not be transmitted over unencrypted HTTP
+   - Solution: Ensure your endpoint URL starts with `https://`
+
+2. **"security: authorization header already present"**
+   - There is a conflict with an existing Authorization header
+   - This prevents accidental credential overwrites
+   - Solution: Check your HTTP client configuration for conflicting authentication settings
 
 **Option 2: Register Your Own OAuth Application**
 
