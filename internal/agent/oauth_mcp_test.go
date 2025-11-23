@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -52,30 +51,21 @@ func TestOpenBrowser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := openBrowser(tt.url)
+			// Test URL validation without opening a real browser
+			err := validateBrowserURL(tt.url)
 
-			// For valid URLs, we expect platform-specific behavior
-			if !tt.wantErr {
-				// On supported platforms (linux, darwin, windows), the command should start
-				// On unsupported platforms, we expect an error
-				if runtime.GOOS != "linux" && runtime.GOOS != "darwin" && runtime.GOOS != "windows" {
-					if err == nil {
-						t.Error("Expected error on unsupported platform, but got nil")
-					}
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("validateBrowserURL() error = nil, wantErr %v", tt.wantErr)
+					return
 				}
-				// On supported platforms, we can't easily test if browser actually opens
-				// without creating a test binary, so we just ensure no parse errors
-				return
-			}
-
-			// For invalid URLs, we expect an error
-			if err == nil {
-				t.Errorf("openBrowser() error = nil, wantErr %v", tt.wantErr)
-				return
-			}
-
-			if tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
-				t.Errorf("openBrowser() error = %v, want error containing %v", err, tt.errMsg)
+				if tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("validateBrowserURL() error = %v, want error containing %v", err, tt.errMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("validateBrowserURL() unexpected error = %v", err)
+				}
 			}
 		})
 	}
@@ -560,15 +550,17 @@ func TestOpenBrowserURLInjection(t *testing.T) {
 
 	for _, url := range maliciousURLs {
 		t.Run("injection_test", func(t *testing.T) {
-			// openBrowser validates URLs before passing to exec.Command
-			// The URL parser should reject these or they should fail safely
-			err := openBrowser(url)
+			// validateBrowserURL should handle these safely without executing anything
+			// The URL parser will accept URLs with these characters (they're valid in URLs)
+			// but the key is they won't be executed as shell commands - they'll be passed
+			// as URL arguments to the browser command which will handle them safely
+			err := validateBrowserURL(url)
 			// We expect either:
-			// 1. URL parsing to fail (invalid URL)
-			// 2. Command to fail (but not execute injected code)
-			// 3. Command to succeed but only open the URL part (system handles safely)
-			// The important thing is that malicious code doesn't execute
-			_ = err // Ignore error - just ensure no panic or code execution
+			// 1. URL parsing to accept them (they're valid URL characters)
+			// 2. They would be safely passed to the browser command (not shell-executed)
+			// The important thing is that validateBrowserURL doesn't panic
+			// and openBrowserImpl (when called) passes them as arguments, not shell commands
+			_ = err // Ignore error - just ensure no panic
 		})
 	}
 }

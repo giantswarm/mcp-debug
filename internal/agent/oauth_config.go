@@ -31,6 +31,10 @@ type OAuthConfig struct {
 
 	// UseOIDC enables OpenID Connect features including nonce validation (optional)
 	UseOIDC bool
+
+	// RegistrationToken is the OAuth registration access token for Dynamic Client Registration
+	// Required if the authorization server has DCR authentication enabled
+	RegistrationToken string
 }
 
 // DefaultOAuthConfig returns a default OAuth configuration

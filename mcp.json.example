@@ -17,6 +17,19 @@
                 "OAUTH_CLIENT_ID": "your-client-id-here",
                 "OAUTH_CLIENT_SECRET": "your-client-secret-here"
             }
+        },
+        "mcp-debug-with-dcr": {
+            "command": "mcp-debug",
+            "args": [
+                "--mcp-server",
+                "--endpoint", "https://protected-server.com/mcp",
+                "--oauth",
+                "--oauth-registration-token", "${OAUTH_REGISTRATION_TOKEN}"
+            ],
+            "env": {
+                "OAUTH_REGISTRATION_TOKEN": "your-registration-token-here"
+            },
+            "_comment": "Security: Registration tokens are sensitive credentials. Store them in environment variables, never commit to version control. Tokens are only transmitted over HTTPS and only to validated registration endpoints."
         }
     }
 } 
