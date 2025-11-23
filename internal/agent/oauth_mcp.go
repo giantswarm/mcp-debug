@@ -267,8 +267,8 @@ func createCallbackHandler(logger *Logger, resultChan chan<- callbackResult) htt
 			logger.Warning("Callback received but already processed")
 		}
 
-		w.Header().Set("Content-Type", "text/html")
-		if _, err := w.Write([]byte(`<html><body><h1>✅ Authorization Successful!</h1><p>You can close this window.</p></body></html>`)); err != nil {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if _, err := w.Write([]byte(`<html><head><meta charset="utf-8"></head><body><h1>✅ Authorization Successful!</h1><p>You can close this window.</p></body></html>`)); err != nil {
 			logger.Warning("Failed to write response: %v", err)
 		}
 	}
