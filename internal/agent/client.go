@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -94,6 +95,16 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 			Scopes:       c.oauthConfig.Scopes,
 			TokenStore:   tokenStore,
 			PKCEEnabled:  c.oauthConfig.UsePKCE,
+		}
+
+		// If a registration token is provided, create a custom HTTP client
+		// that injects it into DCR requests
+		if c.oauthConfig.RegistrationToken != "" {
+			c.logger.Info("Registration access token provided for Dynamic Client Registration")
+			httpClient := &http.Client{
+				Transport: newRegistrationTokenRoundTripper(c.oauthConfig.RegistrationToken, nil),
+			}
+			mcpOAuthConfig.HTTPClient = httpClient
 		}
 
 		// Create OAuth client using mcp-go's native support

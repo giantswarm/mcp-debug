@@ -27,14 +27,15 @@ var (
 	listenAddr      string
 
 	// OAuth flags
-	oauthEnabled      bool
-	oauthClientID     string
-	oauthClientSecret string
-	oauthScopes       []string
-	oauthRedirectURL  string
-	oauthUsePKCE      bool
-	oauthTimeout      time.Duration
-	oauthUseOIDC      bool
+	oauthEnabled           bool
+	oauthClientID          string
+	oauthClientSecret      string
+	oauthScopes            []string
+	oauthRedirectURL       string
+	oauthUsePKCE           bool
+	oauthTimeout           time.Duration
+	oauthUseOIDC           bool
+	oauthRegistrationToken string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -112,6 +113,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&oauthUsePKCE, "oauth-pkce", true, "Use PKCE (Proof Key for Code Exchange) for OAuth flow")
 	rootCmd.Flags().DurationVar(&oauthTimeout, "oauth-timeout", 5*time.Minute, "Maximum time to wait for OAuth authorization")
 	rootCmd.Flags().BoolVar(&oauthUseOIDC, "oauth-oidc", false, "Enable OpenID Connect features including nonce validation")
+	rootCmd.Flags().StringVar(&oauthRegistrationToken, "oauth-registration-token", "", "OAuth registration access token for Dynamic Client Registration (required if server has DCR authentication enabled)")
 
 	// Add subcommands
 	rootCmd.AddCommand(newSelfUpdateCmd())
@@ -166,6 +168,7 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 			UsePKCE:              oauthUsePKCE,
 			AuthorizationTimeout: oauthTimeout,
 			UseOIDC:              oauthUseOIDC,
+			RegistrationToken:    oauthRegistrationToken,
 		}
 
 		// Apply defaults for any unset fields

@@ -209,6 +209,18 @@ If the MCP server supports Dynamic Client Registration (RFC 7591), you can conne
 
 The tool will automatically register itself with the authorization server and obtain a client ID.
 
+**With Authenticated Dynamic Client Registration:**
+
+Some authorization servers require a registration access token for DCR (per RFC 7591 Section 3.2). If you encounter an error like "Registration access token required", you need to provide a registration token:
+
+```bash
+./mcp-debug --oauth \
+  --oauth-registration-token your-registration-token \
+  --endpoint https://protected.server.com/mcp
+```
+
+The registration token is provided as a Bearer token in the Authorization header during the client registration request. Contact your authorization server administrator to obtain a registration access token if DCR authentication is enabled.
+
 ### OAuth Flags
 
 | Flag | Description | Default |
@@ -221,6 +233,7 @@ The tool will automatically register itself with the authorization server and ob
 | `--oauth-pkce` | Use PKCE for authorization | `true` |
 | `--oauth-timeout` | Maximum time to wait for OAuth authorization | `5m` |
 | `--oauth-oidc` | Enable OpenID Connect features (nonce validation) | `false` |
+| `--oauth-registration-token` | OAuth registration access token for authenticated DCR | |
 
 ### OAuth Flow
 
@@ -323,6 +336,24 @@ $ ./mcp-debug --oauth --endpoint https://api.example.com/mcp
 # Wait up to 10 minutes for user to complete authorization
 ./mcp-debug --oauth --oauth-timeout 10m --endpoint https://api.example.com/mcp
 ```
+
+**If DCR fails with "Registration access token required":**
+
+Some servers require authenticated DCR. If you see this error:
+
+```
+Dynamic client registration failed: registration request failed: OAuth error: invalid_token - Registration access token required
+```
+
+You need to provide a registration access token:
+
+```bash
+./mcp-debug --oauth \
+  --oauth-registration-token YOUR_REGISTRATION_TOKEN \
+  --endpoint https://api.example.com/mcp
+```
+
+Contact your server administrator to obtain a registration access token.
 
 **Option 2: Register Your Own OAuth Application**
 

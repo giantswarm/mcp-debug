@@ -399,3 +399,44 @@ func TestOAuthConfig_OIDCFeatures(t *testing.T) {
 		t.Error("Expected UseOIDC to be true")
 	}
 }
+
+func TestOAuthConfig_RegistrationToken(t *testing.T) {
+	tests := []struct {
+		name              string
+		registrationToken string
+		wantErr           bool
+	}{
+		{
+			name:              "valid config with registration token",
+			registrationToken: "test-registration-token-12345",
+			wantErr:           false,
+		},
+		{
+			name:              "valid config without registration token",
+			registrationToken: "",
+			wantErr:           false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &OAuthConfig{
+				Enabled:           true,
+				RedirectURL:       "http://localhost:8765/callback",
+				RegistrationToken: tt.registrationToken,
+			}
+
+			// Apply defaults before validation
+			config = config.WithDefaults()
+
+			err := config.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if config.RegistrationToken != tt.registrationToken {
+				t.Errorf("RegistrationToken = %v, want %v", config.RegistrationToken, tt.registrationToken)
+			}
+		})
+	}
+}
