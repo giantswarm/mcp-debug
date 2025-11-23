@@ -48,21 +48,13 @@ func TestOAuthConfig_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "empty scopes fail validation",
+			name: "empty scopes are allowed",
 			config: &OAuthConfig{
-				Enabled:     true,
-				RedirectURL: "http://localhost:8765/callback",
-				Scopes:      []string{},
+				Enabled:              true,
+				RedirectURL:          "http://localhost:8765/callback",
+				Scopes:               []string{},
+				AuthorizationTimeout: 5 * time.Minute,
 			},
-			wantErr: true,
-		},
-		{
-			name: "empty scopes pass validation after WithDefaults",
-			config: (&OAuthConfig{
-				Enabled:     true,
-				RedirectURL: "http://localhost:8765/callback",
-				Scopes:      []string{},
-			}).WithDefaults(),
 			wantErr: false,
 		},
 		{
@@ -167,8 +159,8 @@ func TestDefaultOAuthConfig(t *testing.T) {
 		t.Error("Default config should have UsePKCE = true")
 	}
 
-	if len(config.Scopes) == 0 {
-		t.Error("Default config should have default scopes")
+	if len(config.Scopes) != 0 {
+		t.Error("Default config should have no scopes")
 	}
 
 	if config.UseOIDC {
@@ -189,7 +181,7 @@ func TestOAuthConfig_WithDefaults(t *testing.T) {
 			},
 			expected: &OAuthConfig{
 				Enabled:              true,
-				Scopes:               []string{"mcp:tools", "mcp:resources"},
+				Scopes:               []string{},
 				RedirectURL:          "http://localhost:8765/callback",
 				AuthorizationTimeout: 5 * time.Minute,
 			},
@@ -205,7 +197,7 @@ func TestOAuthConfig_WithDefaults(t *testing.T) {
 				Enabled:              true,
 				ClientID:             "custom-client",
 				RedirectURL:          "http://localhost:9999/callback",
-				Scopes:               []string{"mcp:tools", "mcp:resources"},
+				Scopes:               []string{},
 				AuthorizationTimeout: 5 * time.Minute,
 			},
 		},

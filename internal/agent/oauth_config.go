@@ -17,7 +17,7 @@ type OAuthConfig struct {
 	// ClientSecret is the OAuth client secret (optional for public clients)
 	ClientSecret string
 
-	// Scopes are the OAuth scopes to request (default: mcp:tools, mcp:resources)
+	// Scopes are the OAuth scopes to request (optional, no default scopes)
 	Scopes []string
 
 	// RedirectURL is the callback URL for OAuth flow (default: http://localhost:8765/callback)
@@ -37,7 +37,7 @@ type OAuthConfig struct {
 func DefaultOAuthConfig() *OAuthConfig {
 	return &OAuthConfig{
 		Enabled:              false,
-		Scopes:               []string{"mcp:tools", "mcp:resources"},
+		Scopes:               []string{},
 		RedirectURL:          "http://localhost:8765/callback",
 		UsePKCE:              true,
 		AuthorizationTimeout: 5 * time.Minute,
@@ -48,11 +48,6 @@ func DefaultOAuthConfig() *OAuthConfig {
 // WithDefaults returns a new config with defaults applied for any unset fields
 func (c *OAuthConfig) WithDefaults() *OAuthConfig {
 	config := *c
-
-	// Set default scopes if none provided
-	if len(config.Scopes) == 0 {
-		config.Scopes = []string{"mcp:tools", "mcp:resources"}
-	}
 
 	// Set default timeout if not provided
 	if config.AuthorizationTimeout == 0 {
@@ -96,11 +91,6 @@ func (c *OAuthConfig) Validate() error {
 		return fmt.Errorf("HTTPS redirect URIs are not supported - callback server only runs on localhost with HTTP (use http://localhost:PORT/callback)")
 	} else {
 		return fmt.Errorf("redirect URI scheme must be http, got: %s (only http://localhost:PORT/callback is supported)", parsedURL.Scheme)
-	}
-
-	// Validate scopes are set (after defaults have been applied)
-	if len(c.Scopes) == 0 {
-		return fmt.Errorf("OAuth scopes are required")
 	}
 
 	// Validate timeout is set (after defaults have been applied)
