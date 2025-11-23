@@ -14,6 +14,12 @@ import (
 	"github.com/mark3labs/mcp-go/client/transport"
 )
 
+// browserOpener is a function type for opening URLs in a browser
+type browserOpener func(string) error
+
+// defaultBrowserOpener is the default implementation for opening browsers
+var defaultBrowserOpener browserOpener = openBrowserImpl
+
 // callbackServerConfig holds configuration for the OAuth callback server
 type callbackServerConfig struct {
 	redirectURL string
@@ -112,7 +118,7 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 	// Open browser
 	c.logger.Info("Opening browser for authorization...")
 	c.logger.Info("Authorization URL: %s", authURL)
-	if err := openBrowser(authURL); err != nil {
+	if err := defaultBrowserOpener(authURL); err != nil {
 		c.logger.Warning("Could not open browser automatically: %v", err)
 		c.logger.Info("Please open this URL in your browser:")
 		c.logger.Info("%s", authURL)
@@ -268,9 +274,8 @@ func createCallbackHandler(logger *Logger, resultChan chan<- callbackResult) htt
 	}
 }
 
-// openBrowser opens the specified URL in the default browser.
-// It validates the URL scheme and uses platform-specific commands.
-func openBrowser(urlStr string) error {
+// validateBrowserURL validates that a URL is safe to open in a browser.
+func validateBrowserURL(urlStr string) error {
 	// Security: Validate URL scheme before opening in browser
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
@@ -279,6 +284,16 @@ func openBrowser(urlStr string) error {
 
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
 		return fmt.Errorf("invalid URL scheme for browser: %s (only http/https allowed)", parsedURL.Scheme)
+	}
+
+	return nil
+}
+
+// openBrowserImpl opens the specified URL in the default browser.
+// It validates the URL scheme and uses platform-specific commands.
+func openBrowserImpl(urlStr string) error {
+	if err := validateBrowserURL(urlStr); err != nil {
+		return err
 	}
 
 	var cmd *exec.Cmd
