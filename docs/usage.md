@@ -216,7 +216,7 @@ The tool will automatically register itself with the authorization server and ob
 | `--oauth` | Enable OAuth authentication | `false` |
 | `--oauth-client-id` | OAuth client ID (optional - uses DCR if not provided) | |
 | `--oauth-client-secret` | OAuth client secret (optional) | |
-| `--oauth-scopes` | OAuth scopes to request (comma-separated) | `mcp:tools,mcp:resources` |
+| `--oauth-scopes` | OAuth scopes to request (comma-separated, optional) | (none) |
 | `--oauth-redirect-url` | Redirect URL for OAuth callback | `http://localhost:8765/callback` |
 | `--oauth-pkce` | Use PKCE for authorization | `true` |
 | `--oauth-timeout` | Maximum time to wait for OAuth authorization | `5m` |
@@ -352,12 +352,16 @@ If the server doesn't support DCR and you can't register your own application, c
 
 ### Understanding OAuth Scopes
 
-**Important:** The scopes you specify with `--oauth-scopes` are for the **MCP server**, not for the underlying service provider (like Google).
+**Important:** OAuth scopes are **optional**. By default, no scopes are sent. The scopes you specify with `--oauth-scopes` are for the **MCP server**, not for the underlying service provider (like Google).
 
-**Correct Scope Usage:**
+**Scope Usage:**
 
 ```bash
-# ✅ Correct: Requesting MCP server scopes
+# ✅ Correct: No scopes (default)
+./mcp-debug --oauth \
+  --endpoint https://mcp-server-for-google.com/mcp
+
+# ✅ Correct: Requesting specific MCP server scopes
 ./mcp-debug --oauth \
   --oauth-scopes "mcp:tools,mcp:resources" \
   --endpoint https://mcp-server-for-google.com/mcp
