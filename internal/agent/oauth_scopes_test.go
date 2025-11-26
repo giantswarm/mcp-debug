@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"reflect"
 	"testing"
 )
@@ -143,7 +144,7 @@ func TestSelectScopes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := selectScopes(tt.config, tt.challenge, tt.metadata)
+			got := selectScopes(tt.config, tt.challenge, tt.metadata, nil)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("selectScopes() = %v, want %v", got, tt.want)
 			}
@@ -223,9 +224,134 @@ func TestScopeSelectionIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := selectScopes(tt.config, tt.challenge, tt.metadata)
+			got := selectScopes(tt.config, tt.challenge, tt.metadata, nil)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("selectScopes() = %v, want %v\nDescription: %s", got, tt.want, tt.description)
+			}
+		})
+	}
+}
+
+// testLogger is a helper for capturing log output in tests
+type testLogger struct {
+	*Logger
+	buffer *bytes.Buffer
+}
+
+func newTestLogger() *testLogger {
+	buf := &bytes.Buffer{}
+	return &testLogger{
+		Logger: NewLoggerWithWriter(false, false, false, buf),
+		buffer: buf,
+	}
+}
+
+func (tl *testLogger) hasWarning(substr string) bool {
+	return bytes.Contains(tl.buffer.Bytes(), []byte(substr))
+}
+
+func (tl *testLogger) warningCount() int {
+	// Count lines that contain warning messages
+	output := tl.buffer.String()
+	if len(output) == 0 {
+		return 0
+	}
+	// Count occurrences of key warning phrases
+	count := 0
+	if bytes.Contains(tl.buffer.Bytes(), []byte("differ from server-discovered scopes")) {
+		count++
+	}
+	if bytes.Contains(tl.buffer.Bytes(), []byte("may lead to authorization failures")) {
+		count++
+	}
+	return count
+}
+
+// TestManualModeWarnings tests that warnings are logged when manual mode diverges from discovered scopes
+func TestManualModeWarnings(t *testing.T) {
+	tests := []struct {
+		name         string
+		config       *OAuthConfig
+		challenge    *WWWAuthenticateChallenge
+		metadata     *ProtectedResourceMetadata
+		wantWarnings bool
+	}{
+		{
+			name: "manual mode with different scopes from challenge - warns",
+			config: &OAuthConfig{
+				ScopeSelectionMode: "manual",
+				Scopes:             []string{"custom:read"},
+			},
+			challenge: &WWWAuthenticateChallenge{
+				Scopes: []string{"server:read"},
+			},
+			metadata:     nil,
+			wantWarnings: true,
+		},
+		{
+			name: "manual mode with different scopes from metadata - warns",
+			config: &OAuthConfig{
+				ScopeSelectionMode: "manual",
+				Scopes:             []string{"custom:read"},
+			},
+			challenge: nil,
+			metadata: &ProtectedResourceMetadata{
+				ScopesSupported: []string{"resource:read"},
+			},
+			wantWarnings: true,
+		},
+		{
+			name: "manual mode with same scopes - no warning",
+			config: &OAuthConfig{
+				ScopeSelectionMode: "manual",
+				Scopes:             []string{"server:read"},
+			},
+			challenge: &WWWAuthenticateChallenge{
+				Scopes: []string{"server:read"},
+			},
+			metadata:     nil,
+			wantWarnings: false,
+		},
+		{
+			name: "manual mode with no discovered scopes - no warning",
+			config: &OAuthConfig{
+				ScopeSelectionMode: "manual",
+				Scopes:             []string{"custom:read"},
+			},
+			challenge:    nil,
+			metadata:     nil,
+			wantWarnings: false,
+		},
+		{
+			name: "auto mode - no warnings (not manual)",
+			config: &OAuthConfig{
+				ScopeSelectionMode: "auto",
+				Scopes:             []string{"config:read"},
+			},
+			challenge: &WWWAuthenticateChallenge{
+				Scopes: []string{"server:read"},
+			},
+			metadata:     nil,
+			wantWarnings: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := newTestLogger()
+			selectScopes(tt.config, tt.challenge, tt.metadata, logger.Logger)
+
+			hasWarnings := logger.warningCount() > 0
+			if hasWarnings != tt.wantWarnings {
+				t.Errorf("Expected warnings=%v, got warnings=%v (count=%d)\nOutput: %s",
+					tt.wantWarnings, hasWarnings, logger.warningCount(), logger.buffer.String())
+			}
+
+			// Check specific warning messages for divergence cases
+			if tt.wantWarnings {
+				if !logger.hasWarning("differ from server-discovered scopes") {
+					t.Errorf("Expected warning about differing scopes not found in output: %s", logger.buffer.String())
+				}
 			}
 		})
 	}
@@ -242,7 +368,7 @@ func TestScopeSelectionSecurityProperties(t *testing.T) {
 			ScopesSupported: []string{"resource:read", "resource:write", "admin"}, // More scopes available
 		}
 
-		got := selectScopes(config, challenge, metadata)
+		got := selectScopes(config, challenge, metadata, nil)
 
 		// Should prefer challenge's specific scope over metadata's broader set
 		if !reflect.DeepEqual(got, []string{"resource:read"}) {
@@ -260,7 +386,7 @@ func TestScopeSelectionSecurityProperties(t *testing.T) {
 			ScopesSupported: []string{"basic:read"}, // Server only needs basic
 		}
 
-		got := selectScopes(config, challenge, metadata)
+		got := selectScopes(config, challenge, metadata, nil)
 
 		// Should use server's basic scope, not user's high privilege config
 		if !reflect.DeepEqual(got, []string{"basic:read"}) {

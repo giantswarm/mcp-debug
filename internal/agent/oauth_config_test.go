@@ -132,6 +132,38 @@ func TestOAuthConfig_Validate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "invalid scope selection mode",
+			config: &OAuthConfig{
+				Enabled:            true,
+				ScopeSelectionMode: "invalid",
+				RedirectURL:        "http://localhost:8765/callback",
+				Scopes:             []string{"mcp:tools"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid auto scope selection mode",
+			config: &OAuthConfig{
+				Enabled:              true,
+				ScopeSelectionMode:   "auto",
+				RedirectURL:          "http://localhost:8765/callback",
+				Scopes:               []string{"mcp:tools"},
+				AuthorizationTimeout: 5 * time.Minute,
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid manual scope selection mode",
+			config: &OAuthConfig{
+				Enabled:              true,
+				ScopeSelectionMode:   "manual",
+				RedirectURL:          "http://localhost:8765/callback",
+				Scopes:               []string{"mcp:tools"},
+				AuthorizationTimeout: 5 * time.Minute,
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

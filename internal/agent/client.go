@@ -142,7 +142,7 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 		// Select scopes using MCP spec priority order
 		// Note: WWW-Authenticate challenge is not available during proactive connection
 		// Priority 1 (challenge scopes) will be available during step-up authorization (future)
-		selectedScopes := selectScopes(c.oauthConfig, nil, discoveredMetadata)
+		selectedScopes := selectScopes(c.oauthConfig, nil, discoveredMetadata, c.logger)
 
 		// Log scope selection for security audit
 		if c.oauthConfig.ScopeSelectionMode == "manual" {
