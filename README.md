@@ -7,7 +7,7 @@
 ## Key Features
 
 - **Connect to any MCP Server**: Works with servers using `streamable-http` transport.
-- **OAuth 2.1 Authentication**: Connect to protected MCP servers with OAuth authentication (supports Dynamic Client Registration).
+- **OAuth 2.1 Authentication**: Connect to protected MCP servers with OAuth authentication (supports Dynamic Client Registration and RFC 8707 Resource Indicators).
 - **Interactive REPL**: Explore available tools, resources, and prompts interactively.
 - **MCP Server Mode**: Acts as an MCP server itself, allowing integration with AI assistants like Cursor.
 - **Verbose Logging**: Detailed logging of JSON-RPC messages for in-depth debugging.

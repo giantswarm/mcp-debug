@@ -36,6 +36,8 @@ var (
 	oauthTimeout           time.Duration
 	oauthUseOIDC           bool
 	oauthRegistrationToken string
+	oauthResourceURI       string
+	oauthSkipResource      bool
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -114,6 +116,8 @@ func init() {
 	rootCmd.Flags().DurationVar(&oauthTimeout, "oauth-timeout", 5*time.Minute, "Maximum time to wait for OAuth authorization")
 	rootCmd.Flags().BoolVar(&oauthUseOIDC, "oauth-oidc", false, "Enable OpenID Connect features including nonce validation")
 	rootCmd.Flags().StringVar(&oauthRegistrationToken, "oauth-registration-token", "", "OAuth registration access token for Dynamic Client Registration (required if server has DCR authentication enabled)")
+	rootCmd.Flags().StringVar(&oauthResourceURI, "oauth-resource-uri", "", "Target resource URI for RFC 8707 (auto-derived from endpoint if not specified)")
+	rootCmd.Flags().BoolVar(&oauthSkipResource, "oauth-skip-resource-param", false, "Skip RFC 8707 resource parameter (for testing with older servers)")
 
 	// Add subcommands
 	rootCmd.AddCommand(newSelfUpdateCmd())
@@ -169,6 +173,8 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 			AuthorizationTimeout: oauthTimeout,
 			UseOIDC:              oauthUseOIDC,
 			RegistrationToken:    oauthRegistrationToken,
+			ResourceURI:          oauthResourceURI,
+			SkipResourceParam:    oauthSkipResource,
 		}
 
 		// Apply defaults for any unset fields
