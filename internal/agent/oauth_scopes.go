@@ -1,4 +1,3 @@
-// Package agent implements scope selection strategy per MCP authorization spec.
 package agent
 
 // selectScopes selects OAuth scopes based on the MCP spec priority order.
@@ -33,22 +32,4 @@ func selectScopes(config *OAuthConfig, challenge *WWWAuthenticateChallenge, meta
 	// Priority 3: Omit scope parameter
 	// Return nil to indicate no scope parameter should be sent
 	return nil
-}
-
-// extractScopesFromChallenge extracts scopes from a WWW-Authenticate challenge.
-// This is a convenience function that handles nil safely.
-func extractScopesFromChallenge(challenge *WWWAuthenticateChallenge) []string {
-	if challenge == nil {
-		return nil
-	}
-	return challenge.Scopes
-}
-
-// extractScopesFromMetadata extracts supported scopes from Protected Resource Metadata.
-// This is a convenience function that handles nil safely.
-func extractScopesFromMetadata(metadata *ProtectedResourceMetadata) []string {
-	if metadata == nil {
-		return nil
-	}
-	return metadata.ScopesSupported
 }
