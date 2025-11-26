@@ -100,6 +100,21 @@ type OAuthConfig struct {
 	// When false, step-up authorization happens automatically
 	// Default: false (automatic for better UX, user can always decline in browser)
 	StepUpUserPrompt bool
+
+	// ClientIDMetadataURL is the HTTPS URL hosting the Client ID Metadata Document
+	// When set, this URL will be used as the client_id per
+	// draft-ietf-oauth-client-id-metadata-document-00
+	// Requirements:
+	//   - MUST use https scheme (HTTP not allowed, even for localhost)
+	//   - MUST contain a path component
+	//   - The document at this URL should contain client metadata in JSON format
+	// Example: "https://app.example.com/oauth/client-metadata.json"
+	ClientIDMetadataURL string
+
+	// DisableCIMD disables Client ID Metadata Documents support
+	// When true, falls back to Dynamic Client Registration or manual registration
+	// Use this for testing with Authorization Servers that don't support CIMD
+	DisableCIMD bool
 }
 
 // DefaultOAuthConfig returns a default OAuth configuration
@@ -191,6 +206,13 @@ func (c *OAuthConfig) Validate() error {
 	// Validate timeout is set (after defaults have been applied)
 	if c.AuthorizationTimeout == 0 {
 		return fmt.Errorf("OAuth authorization timeout is required")
+	}
+
+	// Validate Client ID Metadata URL if provided
+	if c.ClientIDMetadataURL != "" {
+		if err := ValidateClientIDURL(c.ClientIDMetadataURL); err != nil {
+			return fmt.Errorf("invalid Client ID Metadata URL: %w", err)
+		}
 	}
 
 	return nil
