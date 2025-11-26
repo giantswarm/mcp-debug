@@ -59,13 +59,28 @@ func TestBuildASMetadataEndpoints(t *testing.T) {
 			},
 		},
 		{
-			name:      "HTTP scheme allowed",
+			name:      "HTTP scheme allowed for localhost",
 			issuerURL: "http://localhost:8080",
 			wantCount: 2,
 			want: []string{
 				"http://localhost:8080/.well-known/oauth-authorization-server",
 				"http://localhost:8080/.well-known/openid-configuration",
 			},
+		},
+		{
+			name:      "HTTP scheme allowed for 127.0.0.1",
+			issuerURL: "http://127.0.0.1:8080",
+			wantCount: 2,
+			want: []string{
+				"http://127.0.0.1:8080/.well-known/oauth-authorization-server",
+				"http://127.0.0.1:8080/.well-known/openid-configuration",
+			},
+		},
+		{
+			name:        "HTTP scheme rejected for non-localhost",
+			issuerURL:   "http://auth.example.com",
+			wantErr:     true,
+			errContains: "must use https scheme (http only allowed for localhost",
 		},
 		{
 			name:        "invalid URL",
@@ -225,6 +240,35 @@ func TestValidateASMetadata(t *testing.T) {
 			wantErr:     true,
 			errContains: "missing host",
 		},
+		{
+			name: "HTTP allowed for localhost endpoints",
+			metadata: &AuthorizationServerMetadata{
+				Issuer:                "http://localhost",
+				AuthorizationEndpoint: "http://localhost/authorize",
+				TokenEndpoint:         "http://localhost/token",
+			},
+			wantErr: false,
+		},
+		{
+			name: "HTTP rejected for non-localhost issuer",
+			metadata: &AuthorizationServerMetadata{
+				Issuer:                "http://auth.example.com",
+				AuthorizationEndpoint: "https://auth.example.com/authorize",
+				TokenEndpoint:         "https://auth.example.com/token",
+			},
+			wantErr:     true,
+			errContains: "must use https scheme (http only allowed for localhost)",
+		},
+		{
+			name: "HTTP rejected for non-localhost token endpoint",
+			metadata: &AuthorizationServerMetadata{
+				Issuer:                "https://auth.example.com",
+				AuthorizationEndpoint: "https://auth.example.com/authorize",
+				TokenEndpoint:         "http://auth.example.com/token",
+			},
+			wantErr:     true,
+			errContains: "must use https scheme (http only allowed for localhost)",
+		},
 	}
 
 	for _, tt := range tests {
@@ -254,6 +298,7 @@ func TestValidatePKCESupport(t *testing.T) {
 		name           string
 		metadata       *AuthorizationServerMetadata
 		skipValidation bool
+		setEnvVar      bool
 		wantErr        bool
 		errContains    string
 	}{
@@ -301,26 +346,44 @@ func TestValidatePKCESupport(t *testing.T) {
 			errContains:    "does not support S256",
 		},
 		{
-			name: "skip validation with no PKCE",
+			name: "skip validation requires env var",
 			metadata: &AuthorizationServerMetadata{
 				CodeChallengeMethods: []string{},
 			},
 			skipValidation: true,
+			setEnvVar:      false,
+			wantErr:        true,
+			errContains:    "requires MCP_DEBUG_ALLOW_INSECURE=true",
+		},
+		{
+			name: "skip validation with env var and no PKCE",
+			metadata: &AuthorizationServerMetadata{
+				CodeChallengeMethods: []string{},
+			},
+			skipValidation: true,
+			setEnvVar:      true,
 			wantErr:        false,
 		},
 		{
-			name: "skip validation with only plain",
+			name: "skip validation with env var and only plain",
 			metadata: &AuthorizationServerMetadata{
 				CodeChallengeMethods: []string{"plain"},
 			},
 			skipValidation: true,
+			setEnvVar:      true,
 			wantErr:        false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidatePKCESupport(tt.metadata, tt.skipValidation)
+			// Set up environment variable if needed
+			if tt.setEnvVar {
+				t.Setenv("MCP_DEBUG_ALLOW_INSECURE", "true")
+			}
+
+			logger := NewLogger(false, false, false)
+			err := ValidatePKCESupport(tt.metadata, tt.skipValidation, logger)
 
 			if tt.wantErr {
 				if err == nil {

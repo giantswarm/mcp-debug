@@ -18,11 +18,13 @@ package agent
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -68,6 +70,12 @@ const (
 
 	// HTTP timeout for AS metadata requests
 	asMetadataRequestTimeout = 10 * time.Second
+
+	// User agent string for AS metadata requests
+	userAgent = "mcp-debug/1.0"
+
+	// Environment variable to allow insecure operations (testing only)
+	allowInsecureEnvVar = "MCP_DEBUG_ALLOW_INSECURE"
 )
 
 // DiscoverAuthorizationServerMetadata discovers authorization server metadata
@@ -141,6 +149,16 @@ func normalizePath(p string) string {
 	return strings.TrimSuffix(p, "/")
 }
 
+// isLocalhost checks if the given host is localhost or 127.0.0.1
+func isLocalhost(host string) bool {
+	return host == "localhost" ||
+		strings.HasPrefix(host, "localhost:") ||
+		host == "127.0.0.1" ||
+		strings.HasPrefix(host, "127.0.0.1:") ||
+		host == "[::1]" ||
+		strings.HasPrefix(host, "[::1]:")
+}
+
 // buildASMetadataEndpoints constructs AS metadata discovery endpoints
 // based on the issuer URL format per RFC 8414 Section 3 and OIDC Discovery Section 4.
 func buildASMetadataEndpoints(issuerURL string) ([]string, error) {
@@ -153,7 +171,12 @@ func buildASMetadataEndpoints(issuerURL string) ([]string, error) {
 		return nil, fmt.Errorf("issuer URL must be absolute")
 	}
 
-	if parsed.Scheme != "https" && parsed.Scheme != "http" {
+	// Validate scheme: HTTPS required, HTTP only allowed for localhost
+	if parsed.Scheme == "http" {
+		if !isLocalhost(parsed.Host) {
+			return nil, fmt.Errorf("issuer URL must use https scheme (http only allowed for localhost, got: %s)", parsed.Host)
+		}
+	} else if parsed.Scheme != "https" {
 		return nil, fmt.Errorf("issuer URL must use http or https scheme")
 	}
 
@@ -192,9 +215,15 @@ func buildASMetadataEndpoints(issuerURL string) ([]string, error) {
 
 // fetchASMetadata fetches and parses authorization server metadata from the specified URL.
 func fetchASMetadata(ctx context.Context, metadataURL string) (*AuthorizationServerMetadata, error) {
-	// Create HTTP client with timeout
+	// Create HTTP client with timeout and secure TLS configuration
 	client := &http.Client{
 		Timeout: asMetadataRequestTimeout,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+				// InsecureSkipVerify: false (explicit default for security)
+			},
+		},
 	}
 
 	// Create request with context
@@ -205,7 +234,7 @@ func fetchASMetadata(ctx context.Context, metadataURL string) (*AuthorizationSer
 
 	// Set appropriate headers
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "mcp-debug/1.0")
+	req.Header.Set("User-Agent", userAgent)
 
 	// Execute request
 	resp, err := client.Do(req)
@@ -282,7 +311,12 @@ func validateASMetadata(metadata *AuthorizationServerMetadata) error {
 			return fmt.Errorf("%s must be absolute URL: %s", name, endpoint)
 		}
 
-		if parsed.Scheme != "https" && parsed.Scheme != "http" {
+		// Validate scheme: HTTPS required, HTTP only allowed for localhost
+		if parsed.Scheme == "http" {
+			if !isLocalhost(parsed.Host) {
+				return fmt.Errorf("%s must use https scheme (http only allowed for localhost): %s", name, endpoint)
+			}
+		} else if parsed.Scheme != "https" {
 			return fmt.Errorf("%s must use http or https scheme: %s", name, endpoint)
 		}
 
@@ -304,8 +338,19 @@ func validateASMetadata(metadata *AuthorizationServerMetadata) error {
 //   - S256 method is not supported
 //
 // Use skipValidation=true only for testing with non-compliant servers.
-func ValidatePKCESupport(metadata *AuthorizationServerMetadata, skipValidation bool) error {
+// Requires MCP_DEBUG_ALLOW_INSECURE=true environment variable when skipValidation is true.
+func ValidatePKCESupport(metadata *AuthorizationServerMetadata, skipValidation bool, logger *Logger) error {
 	if skipValidation {
+		// Require explicit environment variable to allow insecure operations
+		if os.Getenv(allowInsecureEnvVar) != "true" {
+			return fmt.Errorf("PKCE validation skip requires %s=true environment variable for safety", allowInsecureEnvVar)
+		}
+
+		// Log security warning
+		if logger != nil {
+			logger.Warning("⚠️  SECURITY WARNING: PKCE validation is disabled. This should only be used for testing!")
+		}
+
 		return nil
 	}
 
