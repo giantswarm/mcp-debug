@@ -31,6 +31,7 @@ var (
 	oauthClientID          string
 	oauthClientSecret      string
 	oauthScopes            []string
+	oauthScopeMode         string
 	oauthRedirectURL       string
 	oauthUsePKCE           bool
 	oauthTimeout           time.Duration
@@ -112,7 +113,8 @@ func init() {
 	rootCmd.Flags().BoolVar(&oauthEnabled, "oauth", false, "Enable OAuth authentication for connecting to protected MCP servers")
 	rootCmd.Flags().StringVar(&oauthClientID, "oauth-client-id", "", "OAuth client ID (optional - will use Dynamic Client Registration if not provided)")
 	rootCmd.Flags().StringVar(&oauthClientSecret, "oauth-client-secret", "", "OAuth client secret (optional)")
-	rootCmd.Flags().StringSliceVar(&oauthScopes, "oauth-scopes", []string{}, "OAuth scopes to request (optional)")
+	rootCmd.Flags().StringSliceVar(&oauthScopes, "oauth-scopes", []string{}, "OAuth scopes to request (optional, used with --oauth-scope-mode=manual)")
+	rootCmd.Flags().StringVar(&oauthScopeMode, "oauth-scope-mode", "auto", "Scope selection mode: 'auto' (MCP spec priority, default) or 'manual' (use --oauth-scopes only)")
 	rootCmd.Flags().StringVar(&oauthRedirectURL, "oauth-redirect-url", "http://localhost:8765/callback", "OAuth redirect URL for callback")
 	rootCmd.Flags().BoolVar(&oauthUsePKCE, "oauth-pkce", true, "Use PKCE (Proof Key for Code Exchange) for OAuth flow")
 	rootCmd.Flags().DurationVar(&oauthTimeout, "oauth-timeout", 5*time.Minute, "Maximum time to wait for OAuth authorization")
@@ -172,6 +174,7 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 			ClientID:             oauthClientID,
 			ClientSecret:         oauthClientSecret,
 			Scopes:               oauthScopes,
+			ScopeSelectionMode:   oauthScopeMode,
 			RedirectURL:          oauthRedirectURL,
 			UsePKCE:              oauthUsePKCE,
 			AuthorizationTimeout: oauthTimeout,

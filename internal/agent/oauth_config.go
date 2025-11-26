@@ -18,7 +18,18 @@ type OAuthConfig struct {
 	ClientSecret string
 
 	// Scopes are the OAuth scopes to request (optional, no default scopes)
+	// When ScopeSelectionMode is "manual", these scopes are used directly.
+	// When ScopeSelectionMode is "auto", these scopes are used as a fallback
+	// if no scopes can be determined from WWW-Authenticate or resource metadata.
 	Scopes []string
+
+	// ScopeSelectionMode controls automatic scope selection per MCP spec
+	// - "auto" (default): Follow MCP spec priority (secure by default)
+	//   Priority 1: Use scope from WWW-Authenticate header
+	//   Priority 2: Use scopes_supported from Protected Resource Metadata
+	//   Priority 3: Omit scope parameter entirely
+	// - "manual": Use only the Scopes field value
+	ScopeSelectionMode string
 
 	// RedirectURL is the callback URL for OAuth flow (default: http://localhost:8765/callback)
 	RedirectURL string
@@ -62,6 +73,7 @@ func DefaultOAuthConfig() *OAuthConfig {
 	return &OAuthConfig{
 		Enabled:              false,
 		Scopes:               []string{},
+		ScopeSelectionMode:   "auto", // Secure by default: follow MCP spec
 		RedirectURL:          "http://localhost:8765/callback",
 		UsePKCE:              true,
 		AuthorizationTimeout: 5 * time.Minute,
@@ -83,6 +95,11 @@ func (c *OAuthConfig) WithDefaults() *OAuthConfig {
 		config.RedirectURL = "http://localhost:8765/callback"
 	}
 
+	// Set default scope selection mode if not provided
+	if config.ScopeSelectionMode == "" {
+		config.ScopeSelectionMode = "auto"
+	}
+
 	return &config
 }
 
@@ -90,6 +107,11 @@ func (c *OAuthConfig) WithDefaults() *OAuthConfig {
 func (c *OAuthConfig) Validate() error {
 	if !c.Enabled {
 		return nil
+	}
+
+	// Validate scope selection mode
+	if c.ScopeSelectionMode != "" && c.ScopeSelectionMode != "auto" && c.ScopeSelectionMode != "manual" {
+		return fmt.Errorf("invalid scope selection mode: %s (must be 'auto' or 'manual')", c.ScopeSelectionMode)
 	}
 
 	// RedirectURL is required for the callback server
