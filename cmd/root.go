@@ -41,6 +41,9 @@ var (
 	oauthSkipResource      bool
 	oauthSkipResourceMeta  bool
 	oauthPreferredAuthSrv  string
+	oauthDisableStepUp     bool
+	oauthStepUpMaxRetries  int
+	oauthStepUpPrompt      bool
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -124,6 +127,9 @@ func init() {
 	rootCmd.Flags().BoolVar(&oauthSkipResource, "oauth-skip-resource-param", false, "Skip RFC 8707 resource parameter (for testing with older servers)")
 	rootCmd.Flags().BoolVar(&oauthSkipResourceMeta, "oauth-skip-resource-metadata", false, "Skip RFC 9728 Protected Resource Metadata discovery (for testing with older servers)")
 	rootCmd.Flags().StringVar(&oauthPreferredAuthSrv, "oauth-preferred-auth-server", "", "Preferred authorization server URL when multiple are available")
+	rootCmd.Flags().BoolVar(&oauthDisableStepUp, "oauth-disable-step-up", false, "Disable automatic step-up authorization for insufficient_scope errors")
+	rootCmd.Flags().IntVar(&oauthStepUpMaxRetries, "oauth-step-up-max-retries", 2, "Maximum number of step-up authorization retry attempts")
+	rootCmd.Flags().BoolVar(&oauthStepUpPrompt, "oauth-step-up-prompt", false, "Prompt user before requesting additional scopes during step-up authorization")
 
 	// Add subcommands
 	rootCmd.AddCommand(newSelfUpdateCmd())
@@ -184,6 +190,9 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 			SkipResourceParam:    oauthSkipResource,
 			SkipResourceMetadata: oauthSkipResourceMeta,
 			PreferredAuthServer:  oauthPreferredAuthSrv,
+			EnableStepUpAuth:     !oauthDisableStepUp,
+			StepUpMaxRetries:     oauthStepUpMaxRetries,
+			StepUpUserPrompt:     oauthStepUpPrompt,
 		}
 
 		// Apply defaults for any unset fields

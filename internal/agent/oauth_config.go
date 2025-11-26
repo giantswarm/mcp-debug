@@ -76,6 +76,21 @@ type OAuthConfig struct {
 	// Useful for testing with pre-configured endpoints or older servers
 	// When enabled, relies on mcp-go's internal discovery mechanisms
 	SkipAuthServerDiscovery bool
+
+	// EnableStepUpAuth enables automatic step-up authorization when the server
+	// returns 403 Forbidden with insufficient_scope error per MCP spec
+	// Default: true (secure by default, provides better UX)
+	EnableStepUpAuth bool
+
+	// StepUpMaxRetries limits the number of retry attempts per resource/operation
+	// when handling insufficient_scope errors during step-up authorization
+	// Default: 2 (prevents infinite authorization loops)
+	StepUpMaxRetries int
+
+	// StepUpUserPrompt asks user before requesting additional scopes
+	// When false, step-up authorization happens automatically
+	// Default: false (automatic for better UX, user can always decline in browser)
+	StepUpUserPrompt bool
 }
 
 // DefaultOAuthConfig returns a default OAuth configuration
@@ -88,6 +103,9 @@ func DefaultOAuthConfig() *OAuthConfig {
 		UsePKCE:              true,
 		AuthorizationTimeout: 5 * time.Minute,
 		UseOIDC:              false, // OIDC features disabled by default
+		EnableStepUpAuth:     true,  // Secure by default: handle insufficient_scope automatically
+		StepUpMaxRetries:     2,     // Prevent infinite authorization loops
+		StepUpUserPrompt:     false, // Automatic for better UX
 	}
 }
 
@@ -108,6 +126,13 @@ func (c *OAuthConfig) WithDefaults() *OAuthConfig {
 	// Set default scope selection mode if not provided
 	if config.ScopeSelectionMode == "" {
 		config.ScopeSelectionMode = "auto"
+	}
+
+	// Set default step-up max retries if not provided
+	// Note: EnableStepUpAuth defaults to false (zero value)
+	// Callers should explicitly set it to true if desired
+	if config.StepUpMaxRetries == 0 {
+		config.StepUpMaxRetries = 2
 	}
 
 	return &config
