@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -659,11 +660,12 @@ func TestDiscoverProtectedResourceMetadata(t *testing.T) {
 			endpoint: server.URL,
 		},
 		{
-			name:     "challenge with explicit resource_metadata URL",
+			name:     "challenge with explicit resource_metadata URL (localhost blocked by SSRF protection)",
 			endpoint: server.URL,
 			challenge: &WWWAuthenticateChallenge{
 				ResourceMetadataURL: server.URL + wellKnownPath,
 			},
+			wantErr: true, // SSRF protection should block localhost URLs from challenge
 		},
 	}
 
@@ -705,5 +707,300 @@ func TestDiscoverProtectedResourceMetadataNoServer(t *testing.T) {
 
 	if err == nil {
 		t.Errorf("expected error but got none")
+	}
+}
+
+func TestIsAllowedMetadataURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		url     string
+		wantErr bool
+	}{
+		{
+			name:    "valid https URL",
+			url:     "https://example.com/.well-known/oauth-protected-resource",
+			wantErr: false,
+		},
+		{
+			name:    "valid http URL",
+			url:     "http://example.com/.well-known/oauth-protected-resource",
+			wantErr: false,
+		},
+		{
+			name:    "localhost - should be denied",
+			url:     "http://localhost:8080/.well-known/oauth-protected-resource",
+			wantErr: true,
+		},
+		{
+			name:    "127.0.0.1 - should be denied",
+			url:     "http://127.0.0.1:8080/.well-known/oauth-protected-resource",
+			wantErr: true,
+		},
+		{
+			name:    "127.x.x.x range - should be denied",
+			url:     "http://127.5.5.5/.well-known/oauth-protected-resource",
+			wantErr: true,
+		},
+		{
+			name:    "IPv6 loopback - should be denied",
+			url:     "http://[::1]/.well-known/oauth-protected-resource",
+			wantErr: true,
+		},
+		{
+			name:    "private IP 10.x.x.x - should be denied",
+			url:     "http://10.0.0.1/.well-known/oauth-protected-resource",
+			wantErr: true,
+		},
+		{
+			name:    "private IP 172.16.x.x - should be denied",
+			url:     "http://172.16.0.1/.well-known/oauth-protected-resource",
+			wantErr: true,
+		},
+		{
+			name:    "private IP 192.168.x.x - should be denied",
+			url:     "http://192.168.1.1/.well-known/oauth-protected-resource",
+			wantErr: true,
+		},
+		{
+			name:    "link-local 169.254.x.x - should be denied",
+			url:     "http://169.254.169.254/.well-known/oauth-protected-resource",
+			wantErr: true,
+		},
+		{
+			name:    "0.0.0.0 - should be denied",
+			url:     "http://0.0.0.0/.well-known/oauth-protected-resource",
+			wantErr: true,
+		},
+		{
+			name:    "multicast 224.x.x.x - should be denied",
+			url:     "http://224.0.0.1/.well-known/oauth-protected-resource",
+			wantErr: true,
+		},
+		{
+			name:    "invalid scheme - should be denied",
+			url:     "ftp://example.com/.well-known/oauth-protected-resource",
+			wantErr: true,
+		},
+		{
+			name:    "relative URL - should be denied",
+			url:     "/.well-known/oauth-protected-resource",
+			wantErr: true,
+		},
+		{
+			name:    "missing hostname",
+			url:     "http://",
+			wantErr: true,
+		},
+		{
+			name:    "invalid URL",
+			url:     "not a valid url://",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := isAllowedMetadataURL(tt.url)
+
+			if tt.wantErr && err == nil {
+				t.Errorf("expected error but got none")
+			}
+
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestWarnInsecureAuthServers(t *testing.T) {
+	tests := []struct {
+		name          string
+		metadata      *ProtectedResourceMetadata
+		expectWarning bool
+		warningSubstr string
+	}{
+		{
+			name: "HTTPS server - no warning",
+			metadata: &ProtectedResourceMetadata{
+				Resource: "https://mcp.example.com",
+				AuthorizationServers: []string{
+					"https://auth.example.com",
+				},
+			},
+			expectWarning: false,
+		},
+		{
+			name: "HTTP server - should warn",
+			metadata: &ProtectedResourceMetadata{
+				Resource: "https://mcp.example.com",
+				AuthorizationServers: []string{
+					"http://auth.example.com",
+				},
+			},
+			expectWarning: true,
+			warningSubstr: "HTTP (not HTTPS)",
+		},
+		{
+			name: "mixed HTTP and HTTPS - should warn about HTTP",
+			metadata: &ProtectedResourceMetadata{
+				Resource: "https://mcp.example.com",
+				AuthorizationServers: []string{
+					"https://auth1.example.com",
+					"http://auth2.example.com",
+					"https://auth3.example.com",
+				},
+			},
+			expectWarning: true,
+			warningSubstr: "HTTP (not HTTPS)",
+		},
+		{
+			name: "nil logger - no panic",
+			metadata: &ProtectedResourceMetadata{
+				Resource: "https://mcp.example.com",
+				AuthorizationServers: []string{
+					"http://auth.example.com",
+				},
+			},
+			expectWarning: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf strings.Builder
+			var logger *Logger
+
+			if tt.expectWarning {
+				logger = NewLoggerWithWriter(false, false, false, &buf)
+			}
+
+			// Should not panic
+			warnInsecureAuthServers(tt.metadata, logger)
+
+			if tt.expectWarning {
+				output := buf.String()
+				if !strings.Contains(output, tt.warningSubstr) {
+					t.Errorf("expected warning containing %q, got: %q", tt.warningSubstr, output)
+				}
+			}
+		})
+	}
+}
+
+func TestSplitPreservingQuotesWithEscapes(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		delimiter byte
+		want      []string
+	}{
+		{
+			name:      "escaped quote within quoted value",
+			input:     `a,"b\"c",d`,
+			delimiter: ',',
+			want:      []string{"a", `"b\"c"`, "d"},
+		},
+		{
+			name:      "escaped backslash",
+			input:     `a,"b\\c",d`,
+			delimiter: ',',
+			want:      []string{"a", `"b\\c"`, "d"},
+		},
+		{
+			name:      "escaped quote at end",
+			input:     `"value with \" quote"`,
+			delimiter: ',',
+			want:      []string{`"value with \" quote"`},
+		},
+		{
+			name:      "multiple escaped quotes",
+			input:     `key="value \"with\" quotes"`,
+			delimiter: ',',
+			want:      []string{`key="value \"with\" quotes"`},
+		},
+		{
+			name:      "escaped delimiter inside quotes should not split",
+			input:     `"a\,b","c"`,
+			delimiter: ',',
+			want:      []string{`"a\,b"`, `"c"`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitPreservingQuotes(tt.input, tt.delimiter)
+
+			if len(got) != len(tt.want) {
+				t.Errorf("got %d parts, want %d\ngot: %v\nwant: %v", len(got), len(tt.want), got, tt.want)
+				return
+			}
+
+			for i, part := range got {
+				if part != tt.want[i] {
+					t.Errorf("part[%d] = %q, want %q", i, part, tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestParseAuthParamsWithEscapes(t *testing.T) {
+	tests := []struct {
+		name   string
+		params string
+		want   map[string]string
+	}{
+		{
+			name:   "escaped quote in value",
+			params: `desc="value with \" quote"`,
+			want: map[string]string{
+				"desc": `value with " quote`,
+			},
+		},
+		{
+			name:   "escaped backslash in value",
+			params: `path="C:\\Users\\test"`,
+			want: map[string]string{
+				"path": `C:\Users\test`,
+			},
+		},
+		{
+			name:   "multiple keys with escapes",
+			params: `key1="value \"one\"", key2="value \\two"`,
+			want: map[string]string{
+				"key1": `value "one"`,
+				"key2": `value \two`,
+			},
+		},
+		{
+			name:   "error description with quotes",
+			params: `error="invalid_token", error_description="The token \"abc\" expired"`,
+			want: map[string]string{
+				"error":             "invalid_token",
+				"error_description": `The token "abc" expired`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseAuthParams(tt.params)
+
+			if len(got) != len(tt.want) {
+				t.Errorf("got %d params, want %d", len(got), len(tt.want))
+			}
+
+			for key, wantValue := range tt.want {
+				gotValue, ok := got[key]
+				if !ok {
+					t.Errorf("missing key %q", key)
+					continue
+				}
+				if gotValue != wantValue {
+					t.Errorf("param %q = %q, want %q", key, gotValue, wantValue)
+				}
+			}
+		})
 	}
 }

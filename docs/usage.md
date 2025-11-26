@@ -369,6 +369,36 @@ When disabled, `mcp-debug` falls back to existing OAuth discovery mechanisms (vi
 
 **Security Note:** RFC 9728 discovery is enabled by default as it's required by the MCP specification for proper authorization server discovery and scope selection.
 
+#### Security Protections
+
+`mcp-debug` implements several security protections for RFC 9728 discovery:
+
+**SSRF Protection:**
+
+When a `resource_metadata` URL is provided in the `WWW-Authenticate` header, `mcp-debug` validates it to prevent Server-Side Request Forgery (SSRF) attacks. The following URLs are blocked:
+
+- Localhost and loopback addresses (`localhost`, `127.0.0.1`, `::1`, `127.*.*.*`)
+- Private IP ranges (RFC 1918: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`)
+- Link-local addresses (`169.254.0.0/16`, IPv6 link-local)
+- Special-use IP addresses (`0.0.0.0/8`, multicast ranges)
+- Non-HTTP(S) schemes
+
+This prevents malicious servers from tricking `mcp-debug` into making requests to internal network resources.
+
+**HTTP Warning:**
+
+If an authorization server URL uses HTTP instead of HTTPS, `mcp-debug` will log a warning:
+
+```
+Authorization server using HTTP (not HTTPS): http://auth.example.com - credentials may be exposed to network attacks
+```
+
+While HTTP is permitted by the OAuth 2.0 specification for development purposes, it should never be used in production as it exposes credentials to interception.
+
+**Escaped Characters:**
+
+The `WWW-Authenticate` header parser properly handles escaped quotes and backslashes in parameter values, preventing injection attacks through malformed headers.
+
 ### OAuth Flow
 
 When you run `mcp-debug` with OAuth enabled:

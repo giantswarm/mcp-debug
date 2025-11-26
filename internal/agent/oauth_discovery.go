@@ -1,4 +1,15 @@
 // Package agent implements Protected Resource Metadata Discovery per RFC 9728.
+//
+// Security Features:
+//
+// SSRF Protection: Validates metadata URLs to prevent Server-Side Request Forgery attacks.
+// Blocks requests to localhost, private IP ranges, link-local addresses, and special-use IPs.
+//
+// HTTP Detection: Warns when authorization servers use HTTP instead of HTTPS,
+// as this exposes credentials to network interception.
+//
+// Escaped Characters: Properly handles escaped quotes and backslashes in
+// WWW-Authenticate header parameters to prevent injection attacks.
 package agent
 
 import (
@@ -6,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -118,9 +130,13 @@ func parseAuthParams(params string) map[string]string {
 		key := strings.TrimSpace(part[:eqIdx])
 		value := strings.TrimSpace(part[eqIdx+1:])
 
-		// Remove surrounding quotes from value if present
+		// Remove surrounding quotes from value if present and unescape
 		if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
 			value = value[1 : len(value)-1]
+			// Unescape any escaped quotes within the value
+			value = strings.ReplaceAll(value, `\"`, `"`)
+			// Unescape any escaped backslashes
+			value = strings.ReplaceAll(value, `\\`, `\`)
 		}
 
 		if key != "" {
@@ -131,19 +147,31 @@ func parseAuthParams(params string) map[string]string {
 	return result
 }
 
-// splitPreservingQuotes splits a string by delimiter but preserves quoted sections
+// splitPreservingQuotes splits a string by delimiter but preserves quoted sections.
+// Handles escaped quotes (backslash-escaped) within quoted strings.
 func splitPreservingQuotes(s string, delimiter byte) []string {
 	var result []string
 	var current strings.Builder
 	inQuotes := false
+	escaped := false
 
 	for i := 0; i < len(s); i++ {
 		ch := s[i]
 
-		if ch == '"' {
+		if escaped {
+			// Previous character was backslash, add current char literally
+			current.WriteByte(ch)
+			escaped = false
+		} else if ch == '\\' {
+			// Backslash - mark as escape for next character
+			current.WriteByte(ch)
+			escaped = true
+		} else if ch == '"' {
+			// Quote - toggle quote mode
 			inQuotes = !inQuotes
 			current.WriteByte(ch)
 		} else if ch == delimiter && !inQuotes {
+			// Delimiter outside quotes - split here
 			result = append(result, current.String())
 			current.Reset()
 		} else {
@@ -159,6 +187,57 @@ func splitPreservingQuotes(s string, delimiter byte) []string {
 	return result
 }
 
+// isAllowedMetadataURL validates that a metadata URL is safe to fetch
+// and does not point to internal/private network resources.
+// This prevents SSRF (Server-Side Request Forgery) attacks.
+func isAllowedMetadataURL(urlStr string) error {
+	parsed, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+
+	// Require absolute URL with scheme
+	if !parsed.IsAbs() {
+		return fmt.Errorf("metadata URL must be absolute")
+	}
+
+	// Only allow http and https schemes
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("metadata URL must use http or https scheme, got: %s", parsed.Scheme)
+	}
+
+	hostname := parsed.Hostname()
+	if hostname == "" {
+		return fmt.Errorf("metadata URL missing hostname")
+	}
+
+	// Deny localhost and loopback addresses
+	if hostname == "localhost" || hostname == "127.0.0.1" || strings.HasPrefix(hostname, "127.") ||
+		hostname == "::1" || hostname == "[::1]" {
+		return fmt.Errorf("localhost URLs not allowed for metadata discovery")
+	}
+
+	// Try to parse as IP address
+	ip := net.ParseIP(hostname)
+	if ip != nil {
+		// Deny private IP ranges (RFC 1918, RFC 4193, link-local)
+		if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+			return fmt.Errorf("private IP addresses not allowed for metadata discovery: %s", hostname)
+		}
+
+		// Deny IPv4 special-use addresses
+		// 0.0.0.0/8, 169.254.0.0/16, 224.0.0.0/4, 240.0.0.0/4
+		if ip4 := ip.To4(); ip4 != nil {
+			if ip4[0] == 0 || ip4[0] == 169 && ip4[1] == 254 ||
+				ip4[0] >= 224 {
+				return fmt.Errorf("special-use IP addresses not allowed: %s", hostname)
+			}
+		}
+	}
+
+	return nil
+}
+
 // discoverProtectedResourceMetadata discovers protected resource metadata
 // for the given MCP server endpoint per RFC 9728.
 //
@@ -170,7 +249,21 @@ func discoverProtectedResourceMetadata(ctx context.Context, endpoint string, cha
 	// Priority 1: Use resource_metadata URL from WWW-Authenticate header
 	if challenge != nil && challenge.ResourceMetadataURL != "" {
 		logger.InfoVerbose("Using resource_metadata URL from WWW-Authenticate: %s", challenge.ResourceMetadataURL)
-		return fetchProtectedResourceMetadata(ctx, challenge.ResourceMetadataURL)
+
+		// Validate URL to prevent SSRF attacks
+		if err := isAllowedMetadataURL(challenge.ResourceMetadataURL); err != nil {
+			return nil, fmt.Errorf("invalid resource_metadata URL from WWW-Authenticate: %w", err)
+		}
+
+		metadata, err := fetchProtectedResourceMetadata(ctx, challenge.ResourceMetadataURL)
+		if err != nil {
+			return nil, err
+		}
+
+		// Warn about insecure HTTP authorization servers
+		warnInsecureAuthServers(metadata, logger)
+
+		return metadata, nil
 	}
 
 	// Priority 2 & 3: Try well-known URIs
@@ -191,6 +284,10 @@ func discoverProtectedResourceMetadata(ctx context.Context, endpoint string, cha
 		if logger != nil {
 			logger.Info("Successfully discovered protected resource metadata from: %s", uri)
 		}
+
+		// Warn about insecure HTTP authorization servers
+		warnInsecureAuthServers(metadata, logger)
+
 		return metadata, nil
 	}
 
@@ -323,6 +420,24 @@ func validateProtectedResourceMetadata(metadata *ProtectedResourceMetadata) erro
 	}
 
 	return nil
+}
+
+// warnInsecureAuthServers logs warnings for authorization servers using HTTP instead of HTTPS
+func warnInsecureAuthServers(metadata *ProtectedResourceMetadata, logger *Logger) {
+	if logger == nil {
+		return
+	}
+
+	for _, asURL := range metadata.AuthorizationServers {
+		parsed, err := url.Parse(asURL)
+		if err != nil {
+			continue
+		}
+
+		if parsed.Scheme == "http" {
+			logger.Warning("Authorization server using HTTP (not HTTPS): %s - credentials may be exposed to network attacks", asURL)
+		}
+	}
 }
 
 // selectAuthorizationServer selects an authorization server from the metadata
