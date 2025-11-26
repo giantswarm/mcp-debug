@@ -10,6 +10,25 @@ import (
 	"testing"
 )
 
+// getResourceParam extracts the resource parameter from a request
+func getResourceParam(req *http.Request) (string, error) {
+	if req.Method == http.MethodGet {
+		return req.URL.Query().Get("resource"), nil
+	}
+	if req.Method == http.MethodPost && req.Body != nil {
+		bodyBytes, err := io.ReadAll(req.Body)
+		if err != nil {
+			return "", err
+		}
+		values, err := url.ParseQuery(string(bodyBytes))
+		if err != nil {
+			return "", err
+		}
+		return values.Get("resource"), nil
+	}
+	return "", nil
+}
+
 // TestDeriveResourceURI tests the canonical URI derivation from various endpoint formats
 func TestDeriveResourceURI(t *testing.T) {
 	tests := []struct {
@@ -105,13 +124,12 @@ func TestDeriveResourceURI(t *testing.T) {
 			result, err := deriveResourceURI(tt.endpoint)
 			if tt.expectError {
 				if err == nil {
-					t.Errorf("expected error for endpoint %q, but got none", tt.endpoint)
+					t.Fatalf("expected error for endpoint %q, but got none", tt.endpoint)
 				}
 				return
 			}
 			if err != nil {
-				t.Errorf("unexpected error for endpoint %q: %v", tt.endpoint, err)
-				return
+				t.Fatalf("unexpected error for endpoint %q: %v", tt.endpoint, err)
 			}
 			if result != tt.expected {
 				t.Errorf("deriveResourceURI(%q) = %q, want %q", tt.endpoint, result, tt.expected)
@@ -234,40 +252,18 @@ func TestResourceRoundTripper(t *testing.T) {
 			resp.Body.Close()
 
 			// Verify resource parameter
-			if tt.expectResource {
-				var resourceValue string
-				if capturedReq.Method == http.MethodGet {
-					// Check query parameters
-					resourceValue = capturedReq.URL.Query().Get("resource")
-				} else if capturedReq.Method == http.MethodPost {
-					// Check form data
-					bodyBytes, err := io.ReadAll(capturedReq.Body)
-					if err != nil {
-						t.Fatalf("failed to read captured body: %v", err)
-					}
-					values, err := url.ParseQuery(string(bodyBytes))
-					if err != nil {
-						t.Fatalf("failed to parse form data: %v", err)
-					}
-					resourceValue = values.Get("resource")
-				}
+			resourceValue, err := getResourceParam(capturedReq)
+			if err != nil && tt.expectResource {
+				t.Fatalf("failed to extract resource parameter: %v", err)
+			}
 
+			if tt.expectResource {
 				if resourceValue == "" {
 					t.Errorf("expected resource parameter to be present, but it was missing")
 				} else if resourceValue != tt.expectedResource {
 					t.Errorf("resource parameter = %q, want %q", resourceValue, tt.expectedResource)
 				}
 			} else {
-				// Verify resource parameter is NOT present
-				var resourceValue string
-				if capturedReq.Method == http.MethodGet {
-					resourceValue = capturedReq.URL.Query().Get("resource")
-				} else if capturedReq.Method == http.MethodPost && capturedReq.Body != nil {
-					bodyBytes, _ := io.ReadAll(capturedReq.Body)
-					values, _ := url.ParseQuery(string(bodyBytes))
-					resourceValue = values.Get("resource")
-				}
-
 				if resourceValue != "" {
 					t.Errorf("expected no resource parameter, but found: %q", resourceValue)
 				}

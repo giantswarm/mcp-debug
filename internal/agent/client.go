@@ -89,11 +89,11 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 
 		// Derive or use configured resource URI for RFC 8707
 		var resourceURI string
-		var err error
 		if c.oauthConfig.ResourceURI != "" {
 			resourceURI = c.oauthConfig.ResourceURI
 			c.logger.Info("Using configured resource URI: %s", resourceURI)
 		} else if !c.oauthConfig.SkipResourceParam {
+			var err error
 			resourceURI, err = deriveResourceURI(c.endpoint)
 			if err != nil {
 				return fmt.Errorf("failed to derive resource URI: %w", err)
@@ -131,7 +131,7 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 		}
 
 		// Create HTTP client with all round trippers
-		if transport != http.DefaultTransport || c.oauthConfig.RegistrationToken != "" {
+		if transport != http.DefaultTransport {
 			httpClient := &http.Client{
 				Transport: transport,
 			}

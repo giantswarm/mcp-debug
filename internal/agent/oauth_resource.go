@@ -1,8 +1,11 @@
+// Package agent implements MCP client functionality including OAuth 2.1
+// authentication with RFC 8707 Resource Indicators support.
 package agent
 
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -41,26 +44,33 @@ func deriveResourceURI(endpoint string) (string, error) {
 	scheme := strings.ToLower(parsedURL.Scheme)
 	host := strings.ToLower(parsedURL.Host)
 
-	// Determine if port should be included
-	// Extract hostname and port
-	hostname := host
-	port := ""
-	if colonIdx := strings.LastIndex(host, ":"); colonIdx != -1 {
-		hostname = host[:colonIdx]
-		port = host[colonIdx+1:]
+	// Extract hostname and port using standard library
+	hostname, port, err := net.SplitHostPort(host)
+	if err != nil {
+		// No port specified, use the whole host
+		hostname = host
+		port = ""
 	}
 
 	// Standard ports that should be omitted
-	omitPort := false
-	if (scheme == "https" && port == "443") || (scheme == "http" && port == "80") {
-		omitPort = true
-	}
+	omitPort := (scheme == "https" && port == "443") || (scheme == "http" && port == "80")
 
 	// Reconstruct host with normalized hostname and conditional port
-	if omitPort || port == "" {
-		host = hostname
+	// net.SplitHostPort strips brackets from IPv6 addresses, so we need to add them back
+	if strings.Contains(hostname, ":") {
+		// IPv6 address - add brackets
+		if omitPort || port == "" {
+			host = "[" + hostname + "]"
+		} else {
+			host = "[" + hostname + "]:" + port
+		}
 	} else {
-		host = hostname + ":" + port
+		// IPv4 or hostname
+		if omitPort || port == "" {
+			host = hostname
+		} else {
+			host = hostname + ":" + port
+		}
 	}
 
 	// Build canonical URI
@@ -132,8 +142,10 @@ func (t *resourceRoundTripper) isOAuthRequest(req *http.Request) bool {
 	// Check for token endpoint (POST to /token or similar)
 	if req.Method == http.MethodPost {
 		path := strings.ToLower(req.URL.Path)
-		// Common OAuth token endpoint paths
-		if strings.Contains(path, "/token") || strings.Contains(path, "/oauth2/token") {
+		// Common OAuth token endpoint paths - use suffix matching to avoid false positives
+		if strings.HasSuffix(path, "/token") ||
+			strings.HasSuffix(path, "/oauth/token") ||
+			strings.HasSuffix(path, "/oauth2/token") {
 			return true
 		}
 	}
