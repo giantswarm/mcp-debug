@@ -8,25 +8,24 @@ import (
 	"time"
 )
 
-// TestOAuthEndToEndFlow tests the complete OAuth flow with mock servers
+// TestOAuthEndToEndFlow tests the complete OAuth 2.1 flow with mock servers
+// Verifies compliance with:
+// - RFC 6749 (OAuth 2.0)
+// - RFC 7636 (PKCE)
+// - RFC 8707 (Resource Indicators)
+// - MCP OAuth specification
 func TestOAuthEndToEndFlow(t *testing.T) {
-	// Create mock authorization server
-	mockAS := NewMockAuthServer(t)
-	defer mockAS.Close()
-
-	// Create mock MCP server that requires authentication
-	mockMCP := NewMockMCPServer(t, mockAS.URL)
-	defer mockMCP.Close()
+	env := setupTestEnvironment(t)
+	defer env.cleanup()
 
 	tests := []struct {
 		name            string
 		setupAS         func(*MockAuthServer)
 		setupMCP        func(*MockMCPServer)
 		expectedSuccess bool
-		description     string
 	}{
 		{
-			name: "successful OAuth flow with PKCE and resource indicators",
+			name: "should_complete_authorization_when_using_PKCE_S256_and_RFC8707_resource_indicators",
 			setupAS: func(as *MockAuthServer) {
 				as.supportsPKCE = true
 				as.supportsResourceIndicators = true
@@ -37,10 +36,9 @@ func TestOAuthEndToEndFlow(t *testing.T) {
 				mcp.requiredScopes = []string{"mcp:read"}
 			},
 			expectedSuccess: true,
-			description:     "Complete flow with all security features enabled",
 		},
 		{
-			name: "OAuth flow without resource indicators",
+			name: "should_complete_authorization_when_resource_indicators_not_supported",
 			setupAS: func(as *MockAuthServer) {
 				as.supportsPKCE = true
 				as.supportsResourceIndicators = false
@@ -50,21 +48,20 @@ func TestOAuthEndToEndFlow(t *testing.T) {
 				mcp.requireAuth = true
 			},
 			expectedSuccess: true,
-			description:     "Flow works when resource indicators are not supported",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.setupAS != nil {
-				tt.setupAS(mockAS)
+				tt.setupAS(env.AS)
 			}
 			if tt.setupMCP != nil {
-				tt.setupMCP(mockMCP)
+				tt.setupMCP(env.MCP)
 			}
 
 			// Verify mock servers are working
-			resp, err := http.Get(mockAS.URL + "/.well-known/oauth-authorization-server")
+			resp, err := http.Get(env.AS.URL + "/.well-known/oauth-authorization-server")
 			if err != nil {
 				t.Fatalf("failed to reach AS metadata endpoint: %v", err)
 			}
@@ -78,30 +75,28 @@ func TestOAuthEndToEndFlow(t *testing.T) {
 }
 
 // TestProtectedResourceMetadataIntegration tests metadata discovery with mock MCP server
+// Verifies RFC 9728 (OAuth 2.0 Protected Resource Metadata) compliance
 func TestProtectedResourceMetadataIntegration(t *testing.T) {
-	mockAS := NewMockAuthServer(t)
-	defer mockAS.Close()
-
-	mockMCP := NewMockMCPServer(t, mockAS.URL)
-	defer mockMCP.Close()
+	env := setupTestEnvironment(t)
+	defer env.cleanup()
 
 	ctx := context.Background()
 	logger := NewLogger(false, false, false)
 
 	// Test discovery from well-known URI
-	metadata, err := discoverProtectedResourceMetadata(ctx, mockMCP.URL, nil, logger)
+	metadata, err := discoverProtectedResourceMetadata(ctx, env.MCP.URL, nil, logger)
 	if err != nil {
 		t.Fatalf("discovery failed: %v", err)
 	}
 
-	if metadata.Resource != mockMCP.URL {
-		t.Errorf("Resource = %s, want %s", metadata.Resource, mockMCP.URL)
+	if metadata.Resource != env.MCP.URL {
+		t.Errorf("Resource = %s, want %s", metadata.Resource, env.MCP.URL)
 	}
 
 	if len(metadata.AuthorizationServers) != 1 {
 		t.Errorf("got %d auth servers, want 1", len(metadata.AuthorizationServers))
-	} else if metadata.AuthorizationServers[0] != mockAS.URL {
-		t.Errorf("auth server = %s, want %s", metadata.AuthorizationServers[0], mockAS.URL)
+	} else if metadata.AuthorizationServers[0] != env.AS.URL {
+		t.Errorf("auth server = %s, want %s", metadata.AuthorizationServers[0], env.AS.URL)
 	}
 }
 
@@ -300,20 +295,19 @@ func TestErrorHandling(t *testing.T) {
 }
 
 // TestScopeSelection_Integration tests scope selection with actual metadata
+// Verifies MCP OAuth specification scope selection priority order
 func TestScopeSelection_Integration(t *testing.T) {
-	mockAS := NewMockAuthServer(t)
-	mockAS.scopesSupported = []string{"mcp:read", "mcp:write", "mcp:admin"}
-	defer mockAS.Close()
+	env := setupTestEnvironment(t)
+	defer env.cleanup()
 
-	mockMCP := NewMockMCPServer(t, mockAS.URL)
-	mockMCP.scopesSupported = []string{"mcp:read", "mcp:write"}
-	defer mockMCP.Close()
+	env.AS.scopesSupported = []string{"mcp:read", "mcp:write", "mcp:admin"}
+	env.MCP.scopesSupported = []string{"mcp:read", "mcp:write"}
 
 	ctx := context.Background()
 	logger := NewLogger(false, false, false)
 
 	// Discover protected resource metadata
-	metadata, err := discoverProtectedResourceMetadata(ctx, mockMCP.URL, nil, logger)
+	metadata, err := discoverProtectedResourceMetadata(ctx, env.MCP.URL, nil, logger)
 	if err != nil {
 		t.Fatalf("discovery failed: %v", err)
 	}
@@ -324,8 +318,8 @@ func TestScopeSelection_Integration(t *testing.T) {
 	}
 
 	scopes := selectScopes(config, nil, metadata, logger)
-	if len(scopes) != len(mockMCP.scopesSupported) {
-		t.Errorf("got %d scopes, want %d", len(scopes), len(mockMCP.scopesSupported))
+	if len(scopes) != len(env.MCP.scopesSupported) {
+		t.Errorf("got %d scopes, want %d", len(scopes), len(env.MCP.scopesSupported))
 	}
 }
 

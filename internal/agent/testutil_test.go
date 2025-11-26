@@ -9,7 +9,40 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
+
+// Test timeout constants
+const (
+	testTimeoutShort  = 1 * time.Millisecond
+	testTimeoutNormal = 1 * time.Second
+	testTimeoutLong   = 5 * time.Second
+	testDelayLong     = 100 * time.Millisecond
+)
+
+// testEnv encapsulates a complete test environment with mock servers
+type testEnv struct {
+	AS      *MockAuthServer
+	MCP     *MockMCPServer
+	cleanup func()
+}
+
+// setupTestEnvironment creates a complete test environment with mock AS and MCP servers
+func setupTestEnvironment(t *testing.T) *testEnv {
+	t.Helper()
+
+	mockAS := NewMockAuthServer(t)
+	mockMCP := NewMockMCPServer(t, mockAS.URL)
+
+	return &testEnv{
+		AS:  mockAS,
+		MCP: mockMCP,
+		cleanup: func() {
+			mockMCP.Close()
+			mockAS.Close()
+		},
+	}
+}
 
 // MockAuthServer provides a mock OAuth 2.1 authorization server for testing
 type MockAuthServer struct {
@@ -17,17 +50,15 @@ type MockAuthServer struct {
 	t *testing.T
 
 	// Configuration
-	supportsPKCE                  bool
-	supportsResourceIndicators    bool
-	supportsClientRegistration    bool
-	supportsClientIDMetadata      bool
-	registrationToken             string
-	scopesSupported               []string
-	codeChallengeMethods          []string
-	returnInvalidTokenOnFirstCall bool // For testing error handling
-	returnInsufficientScopeOnce   bool // For testing step-up
-	requiredScopes                []string
-	issuerURL                     string
+	supportsPKCE               bool
+	supportsResourceIndicators bool
+	supportsClientRegistration bool
+	supportsClientIDMetadata   bool
+	registrationToken          string
+	scopesSupported            []string
+	codeChallengeMethods       []string
+	requiredScopes             []string
+	issuerURL                  string
 
 	// State tracking
 	mu                   sync.Mutex
@@ -342,6 +373,15 @@ func (mas *MockAuthServer) GetRegistrationRequests() []RegistrationRequest {
 	mas.mu.Lock()
 	defer mas.mu.Unlock()
 	return append([]RegistrationRequest{}, mas.registrationRequests...)
+}
+
+// ClientWithoutRedirect returns an HTTP client that doesn't follow redirects
+func (mas *MockAuthServer) ClientWithoutRedirect() *http.Client {
+	client := mas.Client()
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return client
 }
 
 // MockMCPServer provides a mock MCP server for testing

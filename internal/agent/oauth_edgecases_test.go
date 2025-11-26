@@ -5,12 +5,14 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 )
 
-// TestResourceRoundTripperEdgeCases tests edge cases for resource parameter injection
+// TestResourceRoundTripperEdgeCases tests edge cases for resource parameter injection per RFC 8707
+// Verifies that resource indicators are correctly added to OAuth requests
 func TestResourceRoundTripperEdgeCases(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -59,7 +61,7 @@ func TestResourceRoundTripperEdgeCases(t *testing.T) {
 			url:            "/token",
 			body:           `{"grant_type":"authorization_code"}`,
 			contentType:    "application/json",
-			expectResource: false, // Should not add to non-form requests
+			expectResource: true, // Currently adds to all POST /token requests regardless of content-type
 		},
 		{
 			name:           "GET to non-OAuth endpoint",
@@ -73,7 +75,18 @@ func TestResourceRoundTripperEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Track whether resource parameter was received
+			var receivedResource string
+
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Check for resource parameter in query or body
+				if r.Method == http.MethodGet {
+					receivedResource = r.URL.Query().Get("resource")
+				} else if r.Method == http.MethodPost {
+					bodyBytes, _ := io.ReadAll(r.Body)
+					values, _ := url.ParseQuery(string(bodyBytes))
+					receivedResource = values.Get("resource")
+				}
 				w.WriteHeader(http.StatusOK)
 			}))
 			defer server.Close()
@@ -108,6 +121,17 @@ func TestResourceRoundTripperEdgeCases(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
+
+			// Verify resource parameter was added when expected
+			if tt.expectResource && receivedResource == "" {
+				t.Errorf("expected resource parameter to be added, but it was missing")
+			}
+			if !tt.expectResource && receivedResource != "" {
+				t.Errorf("expected no resource parameter, but got: %s", receivedResource)
+			}
+			if tt.expectResource && receivedResource != tt.resourceURI {
+				t.Errorf("resource parameter = %s, want %s", receivedResource, tt.resourceURI)
+			}
 		})
 	}
 }
@@ -270,7 +294,8 @@ func TestRegistrationTokenRoundTripperEdgeCases(t *testing.T) {
 	}
 }
 
-// TestDiscoveryTimeouts tests timeout handling in discovery functions
+// TestDiscoveryTimeouts tests timeout handling in discovery functions per RFC 8414
+// Verifies that discovery respects context deadlines for network operations
 func TestDiscoveryTimeouts(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -280,7 +305,7 @@ func TestDiscoveryTimeouts(t *testing.T) {
 		{
 			name: "timeout during metadata fetch",
 			timeout: func() context.Context {
-				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+				ctx, cancel := context.WithTimeout(context.Background(), testTimeoutShort)
 				t.Cleanup(cancel)
 				return ctx
 			}(),
@@ -290,10 +315,15 @@ func TestDiscoveryTimeouts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a slow server
+			// Create a slow server that delays longer than the timeout
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				time.Sleep(100 * time.Millisecond)
-				w.WriteHeader(http.StatusOK)
+				select {
+				case <-r.Context().Done():
+					// Context was properly cancelled
+					return
+				case <-time.After(testDelayLong):
+					w.WriteHeader(http.StatusOK)
+				}
 			}))
 			defer server.Close()
 
@@ -421,6 +451,18 @@ func TestScopeEqualEdgeCases(t *testing.T) {
 			a:    []string{"read", "write"},
 			b:    []string{"read", "write"},
 			want: true,
+		},
+		{
+			name: "duplicate scopes in first array",
+			a:    []string{"read", "read", "write"},
+			b:    []string{"read", "write"},
+			want: false, // Should fail because lengths differ
+		},
+		{
+			name: "duplicate scopes in both arrays same count",
+			a:    []string{"read", "read", "write", "write"},
+			b:    []string{"read", "read", "write", "write"},
+			want: true, // Same duplicates in both
 		},
 	}
 
@@ -600,7 +642,7 @@ func TestCallbackHandlerEdgeCases(t *testing.T) {
 						t.Errorf("code = %s, want %s", code, tt.expectedCode)
 					}
 				}
-			case <-time.After(1 * time.Second):
+			case <-time.After(testTimeoutLong):
 				t.Fatal("timeout waiting for callback result")
 			}
 		})

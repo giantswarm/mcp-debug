@@ -12,6 +12,7 @@ import (
 )
 
 // TestGeneratePKCEChallenge tests PKCE code verifier and challenge generation
+// Verifies RFC 7636 Section 4.1 (code verifier) and Section 4.2 (code challenge) requirements
 func TestGeneratePKCEChallenge(t *testing.T) {
 	tests := []struct {
 		name string
@@ -162,6 +163,10 @@ func TestPKCEChallengeVerification(t *testing.T) {
 }
 
 // TestPKCEIntegrationWithMockServer tests PKCE flow with mock authorization server
+// Verifies RFC 7636 PKCE compliance:
+// - Code verifier must be 43-128 characters (Section 4.1)
+// - Code challenge must be base64url(SHA256(verifier)) for S256 (Section 4.2)
+// - Server must validate code verifier against challenge (Section 4.6)
 func TestPKCEIntegrationWithMockServer(t *testing.T) {
 	// Create mock authorization server with PKCE enabled
 	mockAS := NewMockAuthServer(t)
@@ -190,14 +195,9 @@ func TestPKCEIntegrationWithMockServer(t *testing.T) {
 		"&code_challenge_method=S256" +
 		"&resource=https://mcp.example.com/mcp"
 
-	// Make authorization request (won't follow redirect in test)
-	client := mockAS.Client()
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		// Don't follow redirects, we'll parse the redirect URL
-		return http.ErrUseLastResponse
-	}
-
-	resp, err := client.Get(authURL)
+	// Make authorization request without following redirects
+	httpClient := mockAS.ClientWithoutRedirect()
+	resp, err := httpClient.Get(authURL)
 	if err != nil {
 		t.Fatalf("authorization request failed: %v", err)
 	}
@@ -230,7 +230,7 @@ func TestPKCEIntegrationWithMockServer(t *testing.T) {
 	}
 
 	// Test token request with code verifier
-	tokenResp, err := client.PostForm(mockAS.URL+"/token", url.Values{
+	tokenResp, err := mockAS.Client().PostForm(mockAS.URL+"/token", url.Values{
 		"grant_type":    []string{"authorization_code"},
 		"code":          []string{code},
 		"client_id":     []string{clientID},
@@ -343,12 +343,8 @@ func TestPKCEMethodValidation(t *testing.T) {
 				"&code_challenge_method=" + tt.method +
 				"&resource=https://mcp.example.com/mcp"
 
-			client := mockAS.Client()
-			client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-				return http.ErrUseLastResponse
-			}
-
-			resp, err := client.Get(authURL)
+			httpClient := mockAS.ClientWithoutRedirect()
+			resp, err := httpClient.Get(authURL)
 			if err != nil {
 				t.Fatalf("request failed: %v", err)
 			}
