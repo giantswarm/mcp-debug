@@ -135,6 +135,12 @@ func DiscoverAuthorizationServerMetadata(ctx context.Context, issuerURL string, 
 	return nil, fmt.Errorf("no AS metadata found at any discovery endpoint")
 }
 
+// normalizePath removes leading and trailing slashes from a URL path.
+func normalizePath(p string) string {
+	p = strings.TrimPrefix(p, "/")
+	return strings.TrimSuffix(p, "/")
+}
+
 // buildASMetadataEndpoints constructs AS metadata discovery endpoints
 // based on the issuer URL format per RFC 8414 Section 3 and OIDC Discovery Section 4.
 func buildASMetadataEndpoints(issuerURL string) ([]string, error) {
@@ -157,8 +163,7 @@ func buildASMetadataEndpoints(issuerURL string) ([]string, error) {
 
 	var endpoints []string
 	baseURL := fmt.Sprintf("%s://%s", parsed.Scheme, parsed.Host)
-	path := strings.TrimPrefix(parsed.Path, "/")
-	path = strings.TrimSuffix(path, "/")
+	path := normalizePath(parsed.Path)
 
 	// Issuer URL has path components
 	if path != "" {

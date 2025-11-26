@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -101,7 +102,7 @@ func TestBuildASMetadataEndpoints(t *testing.T) {
 					t.Errorf("expected error containing %q, got none", tt.errContains)
 					return
 				}
-				if tt.errContains != "" && !contains(err.Error(), tt.errContains) {
+				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("error = %v, want error containing %q", err, tt.errContains)
 				}
 				return
@@ -235,7 +236,7 @@ func TestValidateASMetadata(t *testing.T) {
 					t.Errorf("expected error containing %q, got none", tt.errContains)
 					return
 				}
-				if !contains(err.Error(), tt.errContains) {
+				if !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("error = %v, want error containing %q", err, tt.errContains)
 				}
 				return
@@ -326,7 +327,7 @@ func TestValidatePKCESupport(t *testing.T) {
 					t.Errorf("expected error containing %q, got none", tt.errContains)
 					return
 				}
-				if !contains(err.Error(), tt.errContains) {
+				if !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("error = %v, want error containing %q", err, tt.errContains)
 				}
 				return
@@ -429,6 +430,19 @@ func TestFetchASMetadata(t *testing.T) {
 			wantErr:     true,
 			errContains: "unexpected Content-Type",
 		},
+		{
+			name: "response exceeds size limit",
+			setupServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					// Write more than maxASMetadataSize bytes
+					largePayload := make([]byte, maxASMetadataSize+1)
+					w.Write(largePayload)
+				}))
+			},
+			wantErr:     true,
+			errContains: "exceeds maximum size",
+		},
 	}
 
 	for _, tt := range tests {
@@ -446,7 +460,7 @@ func TestFetchASMetadata(t *testing.T) {
 					t.Errorf("expected error containing %q, got none", tt.errContains)
 					return
 				}
-				if !contains(err.Error(), tt.errContains) {
+				if !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("error = %v, want error containing %q", err, tt.errContains)
 				}
 				return
@@ -614,7 +628,7 @@ func TestDiscoverAuthorizationServerMetadata(t *testing.T) {
 					t.Errorf("expected error containing %q, got none", tt.errContains)
 					return
 				}
-				if !contains(err.Error(), tt.errContains) {
+				if !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("error = %v, want error containing %q", err, tt.errContains)
 				}
 				return
@@ -630,19 +644,4 @@ func TestDiscoverAuthorizationServerMetadata(t *testing.T) {
 			}
 		})
 	}
-}
-
-// Helper function to check if a string contains a substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && containsHelper(s, substr)))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
