@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -84,7 +85,7 @@ func TestValidateClientIDURL(t *testing.T) {
 				return
 			}
 			if tt.wantErr && err != nil && tt.errMsg != "" {
-				if !contains(err.Error(), tt.errMsg) {
+				if !strings.Contains(err.Error(), tt.errMsg) {
 					t.Errorf("ValidateClientIDURL() error = %v, expected to contain %q", err, tt.errMsg)
 				}
 			}
@@ -169,7 +170,7 @@ func TestGenerateClientMetadata(t *testing.T) {
 			}
 			if tt.wantErr {
 				if err != nil && tt.errMsg != "" {
-					if !contains(err.Error(), tt.errMsg) {
+					if !strings.Contains(err.Error(), tt.errMsg) {
 						t.Errorf("GenerateClientMetadata() error = %v, expected to contain %q", err, tt.errMsg)
 					}
 				}
@@ -272,7 +273,7 @@ func TestValidateClientMetadata(t *testing.T) {
 				return
 			}
 			if tt.wantErr && err != nil && tt.errMsg != "" {
-				if !contains(err.Error(), tt.errMsg) {
+				if !strings.Contains(err.Error(), tt.errMsg) {
 					t.Errorf("ValidateClientMetadata() error = %v, expected to contain %q", err, tt.errMsg)
 				}
 			}
@@ -390,7 +391,7 @@ func TestFetchClientMetadata(t *testing.T) {
 			}
 			if tt.wantErr {
 				if err != nil && tt.errMsg != "" {
-					if !contains(err.Error(), tt.errMsg) {
+					if !strings.Contains(err.Error(), tt.errMsg) {
 						t.Errorf("FetchClientMetadata() error = %v, expected to contain %q", err, tt.errMsg)
 					}
 				}
@@ -507,25 +508,10 @@ func TestOAuthConfigValidation_CIMD(t *testing.T) {
 				return
 			}
 			if tt.wantErr && err != nil && tt.errMsg != "" {
-				if !contains(err.Error(), tt.errMsg) {
+				if !strings.Contains(err.Error(), tt.errMsg) {
 					t.Errorf("Validate() error = %v, expected to contain %q", err, tt.errMsg)
 				}
 			}
 		})
 	}
-}
-
-// Helper function to check if a string contains a substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && stringContains(s, substr)))
-}
-
-func stringContains(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

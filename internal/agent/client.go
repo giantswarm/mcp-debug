@@ -169,12 +169,10 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 		clientID := c.oauthConfig.ClientID
 
 		if clientID == "" && c.oauthConfig.ClientIDMetadataURL != "" && !c.oauthConfig.DisableCIMD {
-			// Use Client ID Metadata Documents
+			// Use Client ID Metadata Documents (CIMD)
 			// The Authorization Server will fetch client metadata from this HTTPS URL
 			clientID = c.oauthConfig.ClientIDMetadataURL
-			c.logger.Info("Using Client ID Metadata Documents (CIMD)")
-			c.logger.Info("Client ID (metadata URL): %s", clientID)
-			c.logger.Info("Authorization Server will fetch client metadata from this URL")
+			c.logger.Info("Using Client ID Metadata Documents (CIMD): %s", clientID)
 		} else if clientID != "" {
 			c.logger.Info("Using pre-registered client ID: %s", clientID)
 		} else {

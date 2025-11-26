@@ -158,7 +158,6 @@ func fetchClientMetadataWithClient(ctx context.Context, clientIDURL string, http
 			Timeout: clientMetadataRequestTimeout,
 		}
 	}
-	client := httpClient
 
 	// Create request with context
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, clientIDURL, nil)
@@ -171,7 +170,7 @@ func fetchClientMetadataWithClient(ctx context.Context, clientIDURL string, http
 	req.Header.Set("User-Agent", userAgent)
 
 	// Execute request
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
