@@ -12,6 +12,7 @@ package agent
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -156,6 +157,13 @@ func fetchClientMetadataWithClient(ctx context.Context, clientIDURL string, http
 	if httpClient == nil {
 		httpClient = &http.Client{
 			Timeout: clientMetadataRequestTimeout,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					MinVersion: tls.VersionTLS12,
+					// Use secure defaults: modern cipher suites only
+					// Go's default cipher suite selection is secure for TLS 1.2+
+				},
+			},
 		}
 	}
 
@@ -237,10 +245,20 @@ func ValidateClientMetadata(metadata *ClientMetadataDocument) error {
 			return fmt.Errorf("redirect_uri at index %d must be absolute: %s", i, uri)
 		}
 
-		// Warn about localhost security implications
-		// (per spec Section 6: Security Considerations)
-		// Note: We don't prevent localhost, just validate format
-		if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		// Security: Only allow HTTP for localhost/loopback addresses
+		// HTTPS is allowed for any host (per spec Section 6: Security Considerations)
+		if parsed.Scheme == "http" {
+			hostname := parsed.Hostname()
+			// Note: Hostname() strips brackets from IPv6 addresses, so [::1] becomes ::1
+			// Accept various forms of localhost: localhost, 127.0.0.1, ::1, and expanded IPv6 0:0:0:0:0:0:0:1
+			isLocalhost := hostname == "localhost" ||
+				hostname == "127.0.0.1" ||
+				hostname == "::1" ||
+				hostname == "0:0:0:0:0:0:0:1"
+			if !isLocalhost {
+				return fmt.Errorf("redirect_uri at index %d: HTTP scheme only allowed for localhost/127.0.0.1/[::1], got %s", i, hostname)
+			}
+		} else if parsed.Scheme != "https" {
 			return fmt.Errorf("redirect_uri at index %d must use http or https scheme: %s", i, uri)
 		}
 	}

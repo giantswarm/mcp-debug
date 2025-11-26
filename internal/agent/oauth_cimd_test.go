@@ -263,6 +263,48 @@ func TestValidateClientMetadata(t *testing.T) {
 			wantErr: true,
 			errMsg:  "must be absolute",
 		},
+		{
+			name: "HTTP redirect_uri with non-localhost host (security issue)",
+			metadata: &ClientMetadataDocument{
+				ClientID:     "https://app.example.com/oauth/client-metadata.json",
+				RedirectURIs: []string{"http://example.com/callback"},
+			},
+			wantErr: true,
+			errMsg:  "HTTP scheme only allowed for localhost",
+		},
+		{
+			name: "HTTP redirect_uri with public IP (security issue)",
+			metadata: &ClientMetadataDocument{
+				ClientID:     "https://app.example.com/oauth/client-metadata.json",
+				RedirectURIs: []string{"http://192.168.1.1:8080/callback"},
+			},
+			wantErr: true,
+			errMsg:  "HTTP scheme only allowed for localhost",
+		},
+		{
+			name: "valid HTTP localhost with IPv6",
+			metadata: &ClientMetadataDocument{
+				ClientID:     "https://app.example.com/oauth/client-metadata.json",
+				RedirectURIs: []string{"http://[::1]:8765/callback"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid HTTP 127.0.0.1",
+			metadata: &ClientMetadataDocument{
+				ClientID:     "https://app.example.com/oauth/client-metadata.json",
+				RedirectURIs: []string{"http://127.0.0.1:8765/callback"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid HTTPS with any host",
+			metadata: &ClientMetadataDocument{
+				ClientID:     "https://app.example.com/oauth/client-metadata.json",
+				RedirectURIs: []string{"https://example.com/callback"},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
