@@ -66,6 +66,16 @@ type OAuthConfig struct {
 	// when multiple servers are available in the protected resource metadata
 	// If empty, the first server in the list is used
 	PreferredAuthServer string
+
+	// SkipPKCEValidation disables checking for PKCE support in AS metadata
+	// DANGEROUS: Only use for testing servers that support PKCE but don't advertise it
+	// Security: This weakens security by allowing connections to servers without PKCE
+	SkipPKCEValidation bool
+
+	// SkipAuthServerDiscovery disables automatic AS metadata discovery
+	// Useful for testing with pre-configured endpoints or older servers
+	// When enabled, relies on mcp-go's internal discovery mechanisms
+	SkipAuthServerDiscovery bool
 }
 
 // DefaultOAuthConfig returns a default OAuth configuration

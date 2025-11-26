@@ -261,6 +261,8 @@ If you need to rotate your registration token:
 | `--oauth-skip-resource-param` | Skip RFC 8707 resource parameter (for testing older servers) | `false` |
 | `--oauth-skip-resource-metadata` | Skip RFC 9728 Protected Resource Metadata discovery (for testing) | `false` |
 | `--oauth-preferred-auth-server` | Preferred authorization server URL when multiple are available | |
+| `--oauth-skip-pkce-validation` | Skip PKCE support validation in AS metadata (DANGEROUS - testing only) | `false` |
+| `--oauth-skip-auth-server-discovery` | Skip RFC 8414 AS Metadata discovery (for testing) | `false` |
 
 ### RFC 8707 Resource Indicators
 
@@ -369,6 +371,55 @@ If you're connecting to an older MCP server that doesn't support RFC 9728, you c
 When disabled, `mcp-debug` falls back to existing OAuth discovery mechanisms (via mcp-go library).
 
 **Security Note:** RFC 9728 discovery is enabled by default as it's required by the MCP specification for proper authorization server discovery and scope selection.
+
+#### Authorization Server Metadata Discovery (RFC 8414)
+
+Once the authorization server URL is discovered via RFC 9728, `mcp-debug` automatically discovers authorization server metadata per RFC 8414 (OAuth 2.0 Authorization Server Metadata) and OpenID Connect Discovery 1.0.
+
+**Multi-Endpoint Probing:**
+
+For issuer URLs **with path components** (e.g., `https://auth.example.com/tenant1`), `mcp-debug` probes endpoints in this order:
+
+1. OAuth 2.0 with path insertion: `https://auth.example.com/.well-known/oauth-authorization-server/tenant1`
+2. OIDC with path insertion: `https://auth.example.com/.well-known/openid-configuration/tenant1`
+3. OIDC path appending: `https://auth.example.com/tenant1/.well-known/openid-configuration`
+
+For issuer URLs **without path components** (e.g., `https://auth.example.com`), it probes:
+
+1. OAuth 2.0: `https://auth.example.com/.well-known/oauth-authorization-server`
+2. OIDC: `https://auth.example.com/.well-known/openid-configuration`
+
+The first successfully retrieved metadata document is used for the OAuth flow.
+
+**PKCE Support Validation:**
+
+Per the MCP specification (2025-11-25), authorization servers **MUST** support PKCE (Proof Key for Code Exchange) with the S256 method. `mcp-debug` enforces this requirement by:
+
+- Checking for `code_challenge_methods_supported` in the AS metadata
+- Verifying that `S256` is listed as a supported method
+- **Refusing to proceed** if PKCE support is not advertised (fail closed for security)
+
+If you need to test with an older authorization server that supports PKCE but doesn't advertise it:
+
+```bash
+./mcp-debug --oauth \
+  --oauth-skip-pkce-validation \
+  --endpoint https://legacy-auth-server.com/mcp
+```
+
+**Warning:** The `--oauth-skip-pkce-validation` flag weakens security and should only be used for testing. PKCE is a critical security feature that prevents authorization code interception attacks.
+
+**Disabling AS Metadata Discovery:**
+
+For testing with older servers or pre-configured endpoints:
+
+```bash
+./mcp-debug --oauth \
+  --oauth-skip-auth-server-discovery \
+  --endpoint https://legacy-server.com/mcp
+```
+
+When AS metadata discovery is disabled, `mcp-debug` relies on mcp-go's internal discovery mechanisms.
 
 ### OAuth Flow
 
