@@ -186,6 +186,27 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 			transport = newResourceRoundTripper(resourceURI, c.oauthConfig.SkipResourceParam, transport, c.logger)
 		}
 
+		// Add step-up authorization round tripper for handling insufficient_scope errors
+		if c.oauthConfig.EnableStepUpAuth {
+			c.logger.Info("Step-up authorization enabled (will detect insufficient_scope errors)")
+
+			// Create reauthorization function that will be called when step-up is needed
+			// NOTE: Full automatic re-authorization is not yet implemented
+			// The step-up round tripper will detect insufficient_scope errors and provide
+			// actionable information, but requires manual client restart with new scopes
+			reauthorizeFunc := func(ctx context.Context, newScopes []string) error {
+				// LIMITATION: Automatic re-authorization requires deeper integration with
+				// mcp-go's OAuth client to trigger a new authorization flow with additional scopes.
+				// For now, we detect and inform the user of required scopes.
+				c.logger.Warning("Step-up authorization detected but automatic re-authorization not yet implemented")
+				c.logger.Info("Required scopes: %v", newScopes)
+				c.logger.Info("ACTION: Please restart the client with the required scopes listed above")
+				return fmt.Errorf("step-up authorization required - please restart with scopes: %v", newScopes)
+			}
+
+			transport = newStepUpRoundTripper(c.oauthConfig, transport, c.logger, reauthorizeFunc)
+		}
+
 		// Create HTTP client with all round trippers
 		if transport != http.DefaultTransport {
 			httpClient := &http.Client{
