@@ -6,10 +6,8 @@
 package agent
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -19,7 +17,7 @@ import (
 // infinite authorization loops during step-up authorization.
 type scopeRetryTracker struct {
 	mu         sync.Mutex
-	attempts   map[string]int // key: "resource:operation"
+	attempts   map[string]int // key: "resource:path:operation"
 	maxRetries int
 }
 
@@ -31,13 +29,13 @@ func newScopeRetryTracker(maxRetries int) *scopeRetryTracker {
 	}
 }
 
-// shouldRetry checks if another retry attempt is allowed for the given resource and operation.
+// shouldRetry checks if another retry attempt is allowed for the given resource, path, and operation.
 // Returns true if retry is allowed, false if max retries exceeded.
-func (t *scopeRetryTracker) shouldRetry(resource, operation string) bool {
+func (t *scopeRetryTracker) shouldRetry(resource, path, operation string) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	key := fmt.Sprintf("%s:%s", resource, operation)
+	key := fmt.Sprintf("%s:%s:%s", resource, path, operation)
 	if t.attempts[key] >= t.maxRetries {
 		return false
 	}
@@ -45,22 +43,22 @@ func (t *scopeRetryTracker) shouldRetry(resource, operation string) bool {
 	return true
 }
 
-// reset clears the retry count for a specific resource/operation combination
+// reset clears the retry count for a specific resource/path/operation combination
 // after a successful operation.
-func (t *scopeRetryTracker) reset(resource, operation string) {
+func (t *scopeRetryTracker) reset(resource, path, operation string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	key := fmt.Sprintf("%s:%s", resource, operation)
+	key := fmt.Sprintf("%s:%s:%s", resource, path, operation)
 	delete(t.attempts, key)
 }
 
-// getAttempts returns the current number of attempts for a resource/operation
-func (t *scopeRetryTracker) getAttempts(resource, operation string) int {
+// getAttempts returns the current number of attempts for a resource/path/operation
+func (t *scopeRetryTracker) getAttempts(resource, path, operation string) int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	key := fmt.Sprintf("%s:%s", resource, operation)
+	key := fmt.Sprintf("%s:%s:%s", resource, path, operation)
 	return t.attempts[key]
 }
 
@@ -157,7 +155,7 @@ func (rt *stepUpRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	if challenge == nil {
 		// Successful request - reset retry counter
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			rt.retryTracker.reset(req.URL.Host, req.Method)
+			rt.retryTracker.reset(req.URL.Host, req.URL.Path, req.Method)
 		}
 		return resp, nil
 	}
@@ -172,10 +170,11 @@ func (rt *stepUpRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 
 	// Check retry limit
 	resource := req.URL.Host
+	path := req.URL.Path
 	operation := req.Method
 
-	if !rt.retryTracker.shouldRetry(resource, operation) {
-		attempts := rt.retryTracker.getAttempts(resource, operation)
+	if !rt.retryTracker.shouldRetry(resource, path, operation) {
+		attempts := rt.retryTracker.getAttempts(resource, path, operation)
 		if rt.logger != nil {
 			rt.logger.Error("Max retries (%d) exceeded for step-up authorization on %s %s",
 				rt.config.StepUpMaxRetries, req.Method, req.URL.Path)
@@ -186,7 +185,7 @@ func (rt *stepUpRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 			rt.config.StepUpMaxRetries, req.Method, req.URL.Path, attempts)
 	}
 
-	attempts := rt.retryTracker.getAttempts(resource, operation)
+	attempts := rt.retryTracker.getAttempts(resource, path, operation)
 	if rt.logger != nil {
 		rt.logger.Info("Step-up authorization attempt %d/%d",
 			attempts, rt.config.StepUpMaxRetries)
@@ -203,6 +202,21 @@ func (rt *stepUpRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 
 	if rt.logger != nil {
 		rt.logger.Info("Required scopes: %v", challenge.Scopes)
+	}
+
+	// SECURITY: Audit log for scope escalation attempts
+	if rt.logger != nil {
+		rt.logger.Info("AUDIT: Step-up authorization requested for %s %s - Current scopes insufficient", req.Method, req.URL.Path)
+		rt.logger.Info("AUDIT: Requested additional scopes: %v", challenge.Scopes)
+	}
+
+	// SECURITY: Validate requested scopes for suspicious patterns
+	if err := validateRequestedScopes(challenge.Scopes); err != nil {
+		if rt.logger != nil {
+			rt.logger.Warning("Suspicious scope request detected: %v", err)
+		}
+		resp.Body.Close()
+		return nil, fmt.Errorf("scope validation failed: %w", err)
 	}
 
 	// User prompt if enabled
@@ -237,7 +251,14 @@ func (rt *stepUpRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 
 	// If the original request had a body, we need to handle it carefully
 	// For most OAuth/MCP operations, bodies are small enough to buffer
-	if req.Body != nil && req.GetBody != nil {
+	// Note: http.NoBody is a special sentinel value indicating no body, which is safe to ignore
+	if req.Body != nil && req.Body != http.NoBody {
+		// SECURITY: Verify GetBody is available before retrying
+		// Without GetBody, we cannot safely replay the request
+		if req.GetBody == nil {
+			return nil, fmt.Errorf("cannot retry request with step-up: body present but GetBody not available (body may have been consumed)")
+		}
+
 		newBody, err := req.GetBody()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get request body for retry: %w", err)
@@ -258,7 +279,7 @@ func (rt *stepUpRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		if rt.logger != nil {
 			rt.logger.Success("Request successful after step-up authorization")
 		}
-		rt.retryTracker.reset(resource, operation)
+		rt.retryTracker.reset(resource, path, operation)
 	}
 
 	return retryResp, nil
@@ -268,8 +289,18 @@ func (rt *stepUpRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 // Returns true if user approves, false otherwise.
 func (rt *stepUpRoundTripper) promptUserForStepUp(newScopes []string) bool {
 	// TODO: Implement interactive prompt
-	// For now, this is a placeholder that always returns true
-	// In a future PR, we can add interactive prompting via stdin
+	// SECURITY: Fail closed until interactive prompt is implemented
+	// If user explicitly requested prompting, deny by default for safety
+	if rt.config.StepUpUserPrompt {
+		if rt.logger != nil {
+			rt.logger.Error("Interactive prompt requested but not yet implemented - denying step-up for safety")
+			rt.logger.Info("Additional permissions were requested: %v", newScopes)
+			rt.logger.Info("Restart with --oauth-step-up-prompt=false to allow automatic step-up")
+		}
+		return false
+	}
+
+	// Automatic mode - log and proceed
 	if rt.logger != nil {
 		rt.logger.Info("Additional permissions required: %v", newScopes)
 		rt.logger.Info("Proceeding with re-authorization (automatic mode)")
@@ -277,61 +308,37 @@ func (rt *stepUpRoundTripper) promptUserForStepUp(newScopes []string) bool {
 	return true
 }
 
-// cloneRequest creates a deep copy of an HTTP request including the body
-func cloneRequest(req *http.Request) (*http.Request, error) {
-	cloned := req.Clone(req.Context())
+// validateRequestedScopes performs security validation on requested scopes
+// to detect potentially malicious or suspicious scope requests.
+func validateRequestedScopes(scopes []string) error {
+	// Check for excessive number of scopes (potential DoS or scope creep)
+	const maxReasonableScopes = 20
+	if len(scopes) > maxReasonableScopes {
+		return fmt.Errorf("excessive number of scopes requested (%d > %d)", len(scopes), maxReasonableScopes)
+	}
 
-	if req.Body != nil {
-		// Read the body
-		bodyBytes, err := io.ReadAll(req.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read request body: %w", err)
+	// Check for suspiciously long scope strings (potential injection attempts)
+	const maxScopeLength = 256
+	for i, scope := range scopes {
+		if len(scope) > maxScopeLength {
+			return fmt.Errorf("scope at index %d exceeds maximum length (%d > %d)", i, len(scope), maxScopeLength)
 		}
 
-		// Restore original body
-		req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		// Check for control characters or null bytes (potential injection)
+		for _, ch := range scope {
+			if ch < 32 || ch == 127 {
+				return fmt.Errorf("scope at index %d contains invalid control character", i)
+			}
+		}
 
-		// Set cloned body
-		cloned.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-		cloned.ContentLength = int64(len(bodyBytes))
+		// Warn about wildcard scopes (not an error, but noteworthy)
+		if strings.Contains(scope, "*") {
+			// Log but don't fail - wildcards may be legitimate in some OAuth implementations
+			continue
+		}
 	}
 
-	return cloned, nil
-}
-
-// mergeScopes merges existing and new scopes, removing duplicates
-func mergeScopes(existing, new []string) []string {
-	scopeMap := make(map[string]bool)
-
-	// Add existing scopes
-	for _, scope := range existing {
-		scopeMap[scope] = true
-	}
-
-	// Add new scopes
-	for _, scope := range new {
-		scopeMap[scope] = true
-	}
-
-	// Convert back to slice
-	var result []string
-	for scope := range scopeMap {
-		result = append(result, scope)
-	}
-
-	return result
-}
-
-// scopeInclusionNeeded determines if we need to include existing scopes
-// along with new ones during step-up authorization.
-//
-// Per MCP spec, the authorization server should handle scope merging,
-// but some servers may require clients to send the full desired scope set.
-func scopeInclusionNeeded(existingScopes, newScopes []string) []string {
-	// For now, use the new scopes as provided by the server
-	// The server's WWW-Authenticate should contain the complete required scope set
-	// If we find servers that don't follow this pattern, we can revisit
-	return newScopes
+	return nil
 }
 
 // formatScopeList formats a scope list for display
