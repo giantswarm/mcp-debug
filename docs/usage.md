@@ -18,6 +18,7 @@ This guide covers the main functionalities and how to use them.
     - [3. MCP Server Mode (AI Assistant Integration)](#3-mcp-server-mode-ai-assistant-integration)
   - [Transport Protocols](#transport-protocols)
   - [OAuth Authentication](#oauth-authentication)
+    - [OAuth Documentation](#oauth-documentation)
     - [Basic OAuth Usage](#basic-oauth-usage)
     - [OAuth Flags](#oauth-flags)
     - [OAuth Flow](#oauth-flow)
@@ -186,6 +187,23 @@ You can specify the server transport using the `--server-transport` flag.
 ## OAuth Authentication
 
 `mcp-debug` supports OAuth 2.1 authentication for connecting to protected MCP servers. This allows you to debug servers that require user authorization.
+
+### OAuth Documentation
+
+For complete OAuth 2.1 documentation, see the **[OAuth Documentation](oauth/)** which includes:
+
+- **[Overview & Quick Start](oauth/README.md)** - Get started with OAuth
+- **[Discovery](oauth/discovery.md)** - Automatic authorization server and scope discovery (RFC 9728, RFC 8414)
+- **[Resource Indicators](oauth/resource-indicators.md)** - Token audience binding (RFC 8707)
+- **[Scopes](oauth/scopes.md)** - Scope selection modes and step-up authorization
+- **[Client Registration](oauth/client-registration.md)** - Pre-registration, CIMD, and Dynamic Client Registration
+- **[Security](oauth/security.md)** - Security features, PKCE, and best practices
+- **[Testing](oauth/testing.md)** - Compatibility flags for legacy servers
+- **[Configuration](oauth/configuration.md)** - Complete reference for all OAuth options
+- **[Troubleshooting](oauth/troubleshooting.md)** - Common issues and solutions
+- **[Examples](oauth/examples/)** - Step-by-step tutorials
+
+The sections below provide a quick reference. For detailed information, consult the full OAuth documentation.
 
 ### Basic OAuth Usage
 
