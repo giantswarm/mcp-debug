@@ -250,7 +250,8 @@ If you need to rotate your registration token:
 | `--oauth` | Enable OAuth authentication | `false` |
 | `--oauth-client-id` | OAuth client ID (optional - uses DCR if not provided) | |
 | `--oauth-client-secret` | OAuth client secret (optional) | |
-| `--oauth-scopes` | OAuth scopes to request (comma-separated, optional) | (none) |
+| `--oauth-scopes` | OAuth scopes to request (used with manual mode) | (none) |
+| `--oauth-scope-mode` | Scope selection mode: `auto` (MCP spec priority) or `manual` (use --oauth-scopes only) | `auto` |
 | `--oauth-redirect-url` | Redirect URL for OAuth callback | `http://localhost:8765/callback` |
 | `--oauth-pkce` | Use PKCE for authorization | `true` |
 | `--oauth-timeout` | Maximum time to wait for OAuth authorization | `5m` |
@@ -609,6 +610,79 @@ If the server doesn't support DCR and you can't register your own application, c
 3. The Google API scopes are configured in the MCP server, not in mcp-debug
 
 When you authorize, you'll see Google's consent screen with the Google API scopes that the MCP server has requested, but you configure only MCP scopes in mcp-debug.
+
+### OAuth Scope Selection Modes
+
+`mcp-debug` implements intelligent scope selection according to the MCP specification, with two modes: **auto** (default, secure) and **manual** (advanced users).
+
+#### Auto Mode (Recommended)
+
+Auto mode follows the MCP specification's scope selection priority to ensure least-privilege access:
+
+```bash
+# Auto mode is the default - no flag needed
+./mcp-debug --oauth --endpoint https://mcp.example.com/mcp
+```
+
+**Priority Order:**
+1. **WWW-Authenticate scope** (most specific): If the server returns a 401 with required scopes, use those
+2. **Protected Resource Metadata scopes**: Use scopes discovered via RFC 9728
+3. **Omit scope parameter**: If no scopes are discovered, omit the scope parameter (least privilege)
+
+**Benefits:**
+- Follows MCP specification for security
+- Requests only the scopes the server needs
+- Prevents over-privileged tokens
+- Automatically adapts to server requirements
+
+**Example:**
+```bash
+$ ./mcp-debug --oauth --endpoint https://mcp.example.com/mcp
+[INFO] Scope selection mode: auto (MCP spec priority)
+[INFO] Selected scopes from Protected Resource Metadata: [mcp:read mcp:write]
+```
+
+#### Manual Mode (Advanced)
+
+Manual mode allows you to explicitly specify scopes, overriding server recommendations. This is useful for testing or when you know the exact scopes required.
+
+```bash
+# Manually specify scopes
+./mcp-debug --oauth \
+  --oauth-scope-mode manual \
+  --oauth-scopes "mcp:admin,mcp:debug" \
+  --endpoint https://mcp.example.com/mcp
+```
+
+**Security Implications:**
+- Manual scopes may differ from what the server recommends
+- Can lead to authorization failures if scopes are insufficient
+- Can result in over-privileged tokens if scopes are excessive
+- **Warning logged** when manual scopes differ from discovered scopes
+
+**When to use manual mode:**
+- Testing specific scope configurations
+- Debugging authorization issues
+- Working with custom server implementations
+- You know the exact scopes required and want to override discovery
+
+**Example with warning:**
+```bash
+$ ./mcp-debug --oauth --oauth-scope-mode manual \
+    --oauth-scopes "mcp:admin" --endpoint https://mcp.example.com/mcp
+[INFO] Scope selection mode: manual
+[INFO] Requested scopes (manual): [mcp:admin]
+[WARNING] Manual scope mode: requested scopes [mcp:admin] differ from server-discovered scopes [mcp:read]
+[WARNING] This may lead to authorization failures or over-privileged tokens
+```
+
+#### Scope Selection Best Practices
+
+1. **Use auto mode by default** - It implements the principle of least privilege
+2. **Only use manual mode** when you have a specific reason
+3. **Monitor warnings** - They indicate potential scope mismatches
+4. **Test authorization** - Verify manual scopes work before production use
+5. **Document custom scopes** - If using manual mode, document why specific scopes are needed
 
 ### Concurrent Authorization Attempts
 

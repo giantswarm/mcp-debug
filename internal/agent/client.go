@@ -84,6 +84,9 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 
 		c.logger.Info("OAuth authentication enabled")
 
+		// Store discovered metadata for scope selection
+		var discoveredMetadata *ProtectedResourceMetadata
+
 		// Attempt RFC 9728 Protected Resource Metadata discovery (proactive)
 		if !c.oauthConfig.SkipResourceMetadata {
 			c.logger.Info("Attempting RFC 9728 Protected Resource Metadata discovery...")
@@ -93,6 +96,7 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 				c.logger.Info("Falling back to standard OAuth discovery (via mcp-go library)")
 			} else {
 				c.logger.Success("Protected Resource Metadata discovered")
+				discoveredMetadata = metadata
 
 				// Select authorization server
 				authServer, err := selectAuthorizationServer(metadata, c.oauthConfig.PreferredAuthServer)
@@ -105,13 +109,9 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 					// For now, we log the discovery but rely on mcp-go's built-in discovery
 				}
 
-				// Log discovered scopes for scope selection strategy (Issue #43)
+				// Log discovered scopes for scope selection strategy
 				if len(metadata.ScopesSupported) > 0 {
 					c.logger.Info("Resource supports scopes: %v", metadata.ScopesSupported)
-					// TODO: Implement scope selection strategy per MCP spec (Issue #43)
-					// Priority 1: Use scope from WWW-Authenticate (not available in proactive discovery)
-					// Priority 2: Use scopes_supported from metadata (available here)
-					// Priority 3: Omit scope parameter if undefined
 				}
 			}
 		} else {
@@ -139,12 +139,34 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 			c.logger.Warning("RFC 8707 resource parameter disabled - this weakens token security")
 		}
 
+		// Select scopes using MCP spec priority order
+		// Note: WWW-Authenticate challenge is not available during proactive connection
+		// Priority 1 (challenge scopes) will be available during step-up authorization (future)
+		selectedScopes := selectScopes(c.oauthConfig, nil, discoveredMetadata, c.logger)
+
+		// Log scope selection for security audit
+		if c.oauthConfig.ScopeSelectionMode == "manual" {
+			c.logger.Info("Scope selection mode: manual")
+			c.logger.Info("Requested scopes (manual): %v", selectedScopes)
+		} else {
+			c.logger.Info("Scope selection mode: auto (MCP spec priority)")
+			if selectedScopes != nil {
+				if discoveredMetadata != nil && len(discoveredMetadata.ScopesSupported) > 0 {
+					c.logger.Info("Selected scopes from Protected Resource Metadata: %v", selectedScopes)
+				} else {
+					c.logger.Info("Selected scopes from configuration: %v", selectedScopes)
+				}
+			} else {
+				c.logger.Info("No scopes selected - scope parameter will be omitted (least privilege)")
+			}
+		}
+
 		// Create mcp-go OAuth config
 		mcpOAuthConfig := client.OAuthConfig{
 			ClientID:     c.oauthConfig.ClientID,
 			ClientSecret: c.oauthConfig.ClientSecret,
 			RedirectURI:  c.oauthConfig.RedirectURL,
-			Scopes:       c.oauthConfig.Scopes,
+			Scopes:       selectedScopes,
 			TokenStore:   tokenStore,
 			PKCEEnabled:  c.oauthConfig.UsePKCE,
 		}
