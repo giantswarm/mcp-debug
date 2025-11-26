@@ -35,6 +35,16 @@ type OAuthConfig struct {
 	// RegistrationToken is the OAuth registration access token for Dynamic Client Registration
 	// Required if the authorization server has DCR authentication enabled
 	RegistrationToken string
+
+	// ResourceURI is the target MCP server URI for RFC 8707 Resource Indicators
+	// If empty, automatically derived from endpoint URL
+	// This parameter is included in authorization and token requests for better security
+	ResourceURI string
+
+	// SkipResourceParam disables RFC 8707 resource parameter inclusion
+	// Only use this for testing with older servers that don't support RFC 8707
+	// Security: Disabling this weakens token audience binding
+	SkipResourceParam bool
 }
 
 // DefaultOAuthConfig returns a default OAuth configuration

@@ -256,6 +256,52 @@ If you need to rotate your registration token:
 | `--oauth-timeout` | Maximum time to wait for OAuth authorization | `5m` |
 | `--oauth-oidc` | Enable OpenID Connect features (nonce validation) | `false` |
 | `--oauth-registration-token` | OAuth registration access token for authenticated DCR | |
+| `--oauth-resource-uri` | Target resource URI for RFC 8707 (auto-derived if not specified) | (auto-derived) |
+| `--oauth-skip-resource-param` | Skip RFC 8707 resource parameter (for testing older servers) | `false` |
+
+### RFC 8707 Resource Indicators
+
+`mcp-debug` implements [RFC 8707: Resource Indicators for OAuth 2.0](https://www.rfc-editor.org/rfc/rfc8707.html) to improve token security through audience binding. This ensures that access tokens are bound to the specific MCP server you're connecting to, preventing token misuse if they're intercepted.
+
+**How It Works:**
+
+When OAuth is enabled, `mcp-debug` automatically:
+1. Derives a canonical resource URI from your endpoint (e.g., `https://mcp.example.com/mcp`)
+2. Includes this URI as the `resource` parameter in:
+   - Authorization requests (when requesting access)
+   - Token exchange requests (when obtaining tokens)
+   - Refresh token requests (when renewing tokens)
+
+**Resource URI Canonicalization:**
+
+The resource URI follows RFC 8707 rules:
+- Lowercase scheme and host: `HTTPS://Example.COM/mcp` → `https://example.com/mcp`
+- Standard ports omitted: `https://example.com:443/mcp` → `https://example.com/mcp`
+- Non-standard ports included: `https://example.com:8443/mcp` → `https://example.com:8443/mcp`
+- Path preserved: `https://example.com/api/v1/mcp` → `https://example.com/api/v1/mcp`
+- Trailing slashes removed: `https://example.com/mcp/` → `https://example.com/mcp`
+
+**Manual Resource URI:**
+
+You can explicitly specify the resource URI if needed:
+
+```bash
+./mcp-debug --oauth \
+  --oauth-resource-uri "https://mcp.example.com/mcp" \
+  --endpoint https://mcp.example.com:8443/mcp
+```
+
+**Testing with Older Servers:**
+
+If you're connecting to an older authorization server that doesn't support RFC 8707, you can disable the resource parameter:
+
+```bash
+./mcp-debug --oauth \
+  --oauth-skip-resource-param \
+  --endpoint https://legacy-server.com/mcp
+```
+
+**Security Note:** Disabling the resource parameter weakens token audience binding. Only use `--oauth-skip-resource-param` for testing compatibility with legacy servers.
 
 ### OAuth Flow
 
@@ -263,12 +309,13 @@ When you run `mcp-debug` with OAuth enabled:
 
 1. **mcp-debug** attempts to connect to the server
 2. If OAuth endpoints are not provided, they are auto-discovered via server metadata
-3. A local callback server starts on your machine (default: port 8765)
-4. Your default browser opens to the authorization page
-5. You log in and grant permissions
-6. The authorization server redirects back to mcp-debug
-7. **mcp-debug** exchanges the authorization code for an access token
-8. The connection proceeds with authenticated requests
+3. The resource URI is derived from the endpoint for RFC 8707
+4. A local callback server starts on your machine (default: port 8765)
+5. Your default browser opens to the authorization page (with resource parameter)
+6. You log in and grant permissions
+7. The authorization server redirects back to mcp-debug
+8. **mcp-debug** exchanges the authorization code for an access token (with resource parameter)
+9. The connection proceeds with authenticated requests
 
 ### Token Management
 

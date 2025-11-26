@@ -87,6 +87,24 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 		// Create token store for mcp-go
 		tokenStore := client.NewMemoryTokenStore()
 
+		// Derive or use configured resource URI for RFC 8707
+		var resourceURI string
+		var err error
+		if c.oauthConfig.ResourceURI != "" {
+			resourceURI = c.oauthConfig.ResourceURI
+			c.logger.Info("Using configured resource URI: %s", resourceURI)
+		} else if !c.oauthConfig.SkipResourceParam {
+			resourceURI, err = deriveResourceURI(c.endpoint)
+			if err != nil {
+				return fmt.Errorf("failed to derive resource URI: %w", err)
+			}
+			c.logger.Info("Derived resource URI from endpoint: %s", resourceURI)
+		}
+
+		if c.oauthConfig.SkipResourceParam {
+			c.logger.Warning("RFC 8707 resource parameter disabled - this weakens token security")
+		}
+
 		// Create mcp-go OAuth config
 		mcpOAuthConfig := client.OAuthConfig{
 			ClientID:     c.oauthConfig.ClientID,
@@ -97,13 +115,25 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 			PKCEEnabled:  c.oauthConfig.UsePKCE,
 		}
 
-		// If a registration token is provided, create a custom HTTP client
-		// that injects it into DCR requests with enhanced security validations
+		// Build HTTP client with custom round trippers
+		var transport http.RoundTripper = http.DefaultTransport
+
+		// Add registration token round tripper if needed
 		if c.oauthConfig.RegistrationToken != "" {
 			c.logger.Info("Registration access token provided for Dynamic Client Registration")
 			c.logger.Info("Security: Token will only be sent over HTTPS to prevent credential exposure")
+			transport = newRegistrationTokenRoundTripper(c.oauthConfig.RegistrationToken, transport, c.logger)
+		}
+
+		// Add resource parameter round tripper (RFC 8707)
+		if !c.oauthConfig.SkipResourceParam && resourceURI != "" {
+			transport = newResourceRoundTripper(resourceURI, c.oauthConfig.SkipResourceParam, transport, c.logger)
+		}
+
+		// Create HTTP client with all round trippers
+		if transport != http.DefaultTransport || c.oauthConfig.RegistrationToken != "" {
 			httpClient := &http.Client{
-				Transport: newRegistrationTokenRoundTripper(c.oauthConfig.RegistrationToken, nil, c.logger),
+				Transport: transport,
 			}
 			mcpOAuthConfig.HTTPClient = httpClient
 		}
