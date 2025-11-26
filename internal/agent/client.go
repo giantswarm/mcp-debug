@@ -84,6 +84,40 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 
 		c.logger.Info("OAuth authentication enabled")
 
+		// Attempt RFC 9728 Protected Resource Metadata discovery (proactive)
+		if !c.oauthConfig.SkipResourceMetadata {
+			c.logger.Info("Attempting RFC 9728 Protected Resource Metadata discovery...")
+			metadata, err := discoverProtectedResourceMetadata(ctx, c.endpoint, nil, c.logger)
+			if err != nil {
+				c.logger.Warning("Protected Resource Metadata discovery failed: %v", err)
+				c.logger.Info("Falling back to standard OAuth discovery (via mcp-go library)")
+			} else {
+				c.logger.Success("Protected Resource Metadata discovered")
+
+				// Select authorization server
+				authServer, err := selectAuthorizationServer(metadata, c.oauthConfig.PreferredAuthServer)
+				if err != nil {
+					c.logger.Warning("Failed to select authorization server: %v", err)
+				} else {
+					c.logger.Info("Using authorization server: %s", authServer)
+					// Note: mcp-go doesn't currently support setting a custom authorization server URL
+					// This would need to be added to the library for full RFC 9728 support
+					// For now, we log the discovery but rely on mcp-go's built-in discovery
+				}
+
+				// Log discovered scopes for scope selection strategy (Issue #43)
+				if len(metadata.ScopesSupported) > 0 {
+					c.logger.Info("Resource supports scopes: %v", metadata.ScopesSupported)
+					// TODO: Implement scope selection strategy per MCP spec (Issue #43)
+					// Priority 1: Use scope from WWW-Authenticate (not available in proactive discovery)
+					// Priority 2: Use scopes_supported from metadata (available here)
+					// Priority 3: Omit scope parameter if undefined
+				}
+			}
+		} else {
+			c.logger.Warning("RFC 9728 Protected Resource Metadata discovery disabled")
+		}
+
 		// Create token store for mcp-go
 		tokenStore := client.NewMemoryTokenStore()
 

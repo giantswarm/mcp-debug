@@ -38,6 +38,8 @@ var (
 	oauthRegistrationToken string
 	oauthResourceURI       string
 	oauthSkipResource      bool
+	oauthSkipResourceMeta  bool
+	oauthPreferredAuthSrv  string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -118,6 +120,8 @@ func init() {
 	rootCmd.Flags().StringVar(&oauthRegistrationToken, "oauth-registration-token", "", "OAuth registration access token for Dynamic Client Registration (required if server has DCR authentication enabled)")
 	rootCmd.Flags().StringVar(&oauthResourceURI, "oauth-resource-uri", "", "Target resource URI for RFC 8707 (auto-derived from endpoint if not specified)")
 	rootCmd.Flags().BoolVar(&oauthSkipResource, "oauth-skip-resource-param", false, "Skip RFC 8707 resource parameter (for testing with older servers)")
+	rootCmd.Flags().BoolVar(&oauthSkipResourceMeta, "oauth-skip-resource-metadata", false, "Skip RFC 9728 Protected Resource Metadata discovery (for testing with older servers)")
+	rootCmd.Flags().StringVar(&oauthPreferredAuthSrv, "oauth-preferred-auth-server", "", "Preferred authorization server URL when multiple are available")
 
 	// Add subcommands
 	rootCmd.AddCommand(newSelfUpdateCmd())
@@ -175,6 +179,8 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 			RegistrationToken:    oauthRegistrationToken,
 			ResourceURI:          oauthResourceURI,
 			SkipResourceParam:    oauthSkipResource,
+			SkipResourceMetadata: oauthSkipResourceMeta,
+			PreferredAuthServer:  oauthPreferredAuthSrv,
 		}
 
 		// Apply defaults for any unset fields

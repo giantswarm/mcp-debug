@@ -102,6 +102,20 @@ func (l *Logger) Warning(format string, args ...interface{}) {
 	fmt.Fprintf(l.writer, "[%s] %s\n", l.timestamp(), l.colorize(msg, colorYellow))
 }
 
+// InfoVerbose logs an informational message only in verbose mode
+func (l *Logger) InfoVerbose(format string, args ...interface{}) {
+	if l != nil && l.verbose {
+		l.Info(format, args...)
+	}
+}
+
+// WarningVerbose logs a warning message only in verbose mode
+func (l *Logger) WarningVerbose(format string, args ...interface{}) {
+	if l != nil && l.verbose {
+		l.Warning(format, args...)
+	}
+}
+
 // Request logs an outgoing request
 func (l *Logger) Request(method string, params interface{}) {
 	if !l.jsonRPCMode {
