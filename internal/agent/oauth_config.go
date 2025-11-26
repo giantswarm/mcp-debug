@@ -32,6 +32,15 @@ type OAuthConfig struct {
 	ScopeSelectionMode string
 
 	// RedirectURL is the callback URL for OAuth flow (default: http://localhost:8765/callback)
+	//
+	// IMPORTANT SECURITY LIMITATION:
+	// - HTTPS redirect URIs are NOT currently supported
+	// - HTTP is only allowed for localhost/127.0.0.1/[::1] addresses
+	// - The callback server runs on localhost only with HTTP
+	// - For production OAuth flows requiring HTTPS callbacks, this is a known limitation
+	//
+	// This design follows OAuth 2.1 best practices for native/desktop applications
+	// which use localhost loopback for authorization callbacks.
 	RedirectURL string
 
 	// UsePKCE enables Proof Key for Code Exchange (recommended, enabled by default)
@@ -140,7 +149,12 @@ func (c *OAuthConfig) Validate() error {
 	if parsedURL.Scheme == "http" {
 		hostname := parsedURL.Hostname()
 		// Note: Hostname() strips brackets from IPv6 addresses, so [::1] becomes ::1
-		if hostname != "localhost" && hostname != "127.0.0.1" && hostname != "::1" {
+		// Accept various forms of localhost: localhost, 127.0.0.1, ::1, and expanded IPv6 0:0:0:0:0:0:0:1
+		isLocalhost := hostname == "localhost" ||
+			hostname == "127.0.0.1" ||
+			hostname == "::1" ||
+			hostname == "0:0:0:0:0:0:0:1"
+		if !isLocalhost {
 			return fmt.Errorf("HTTP redirect URIs are only allowed for localhost/127.0.0.1/[::1], got: %s", hostname)
 		}
 	} else if parsedURL.Scheme == "https" {

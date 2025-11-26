@@ -341,6 +341,16 @@ func TestHTTPSEnforcement(t *testing.T) {
 			wantErr:     false,
 		},
 		{
+			name:        "IPv6 loopback [::1] HTTP allowed",
+			redirectURL: "http://[::1]:8765/callback",
+			wantErr:     false,
+		},
+		{
+			name:        "IPv6 loopback expanded form [0:0:0:0:0:0:0:1] HTTP allowed",
+			redirectURL: "http://[0:0:0:0:0:0:0:1]:8765/callback",
+			wantErr:     false,
+		},
+		{
 			name:        "non-localhost HTTP rejected",
 			redirectURL: "http://example.com/callback",
 			wantErr:     true,

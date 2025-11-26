@@ -45,6 +45,12 @@ func setupTestEnvironment(t *testing.T) *testEnv {
 }
 
 // MockAuthServer provides a mock OAuth 2.1 authorization server for testing
+//
+// SECURITY NOTE: This is a TEST-ONLY implementation.
+// Production implementations must:
+// - Use constant-time comparison (subtle.ConstantTimeCompare) for token validation
+// - Never store code verifiers after validation (they should be immediately discarded)
+// - Implement proper rate limiting and request validation
 type MockAuthServer struct {
 	*httptest.Server
 	t *testing.T
@@ -73,11 +79,15 @@ type MockAuthServer struct {
 }
 
 // TokenInfo stores information about issued tokens
+//
+// SECURITY NOTE: The CodeVerifier field is stored here for test validation purposes only.
+// In production OAuth servers, code verifiers MUST be discarded immediately after validation
+// and should NEVER be stored alongside access tokens.
 type TokenInfo struct {
 	ClientID     string
 	Scopes       []string
 	Resource     string
-	CodeVerifier string // For PKCE validation
+	CodeVerifier string // For PKCE validation (TEST ONLY - never store in production)
 }
 
 // ClientInfo stores registered client information
@@ -313,6 +323,8 @@ func (mas *MockAuthServer) handleRegister(w http.ResponseWriter, r *http.Request
 	}
 
 	// Validate registration token if required
+	// SECURITY NOTE: This uses simple string comparison for testing only.
+	// Production implementations MUST use subtle.ConstantTimeCompare() to prevent timing attacks.
 	if mas.registrationToken != "" {
 		authHeader := r.Header.Get("Authorization")
 		expectedAuth := "Bearer " + mas.registrationToken
