@@ -258,6 +258,8 @@ If you need to rotate your registration token:
 | `--oauth-registration-token` | OAuth registration access token for authenticated DCR | |
 | `--oauth-resource-uri` | Target resource URI for RFC 8707 (auto-derived if not specified) | (auto-derived) |
 | `--oauth-skip-resource-param` | Skip RFC 8707 resource parameter (for testing older servers) | `false` |
+| `--oauth-skip-resource-metadata` | Skip RFC 9728 Protected Resource Metadata discovery (for testing) | `false` |
+| `--oauth-preferred-auth-server` | Preferred authorization server URL when multiple are available | |
 
 ### RFC 8707 Resource Indicators
 
@@ -302,6 +304,70 @@ If you're connecting to an older authorization server that doesn't support RFC 8
 ```
 
 **Security Note:** Disabling the resource parameter weakens token audience binding. Only use `--oauth-skip-resource-param` for testing compatibility with legacy servers.
+
+### RFC 9728 Protected Resource Metadata Discovery
+
+`mcp-debug` implements [RFC 9728: OAuth 2.0 Protected Resource Metadata](https://datatracker.ietf.org/doc/html/rfc9728) to automatically discover authorization server locations and required scopes from the MCP server.
+
+**How It Works:**
+
+When OAuth is enabled, `mcp-debug` automatically:
+1. Makes an initial request to the MCP server (expects 401 Unauthorized)
+2. Parses the `WWW-Authenticate` header to extract:
+   - `resource_metadata` URL (if provided)
+   - `scope` parameter (required scopes for this resource)
+3. Fetches Protected Resource Metadata from:
+   - The `resource_metadata` URL if provided, OR
+   - Well-known URIs in priority order:
+     - `https://mcp.example.com/.well-known/oauth-protected-resource/mcp` (path-based)
+     - `https://mcp.example.com/.well-known/oauth-protected-resource` (root)
+4. Extracts authorization server URLs and supported scopes
+5. Proceeds with OAuth authorization using the discovered authorization server
+
+**Example WWW-Authenticate Header:**
+
+```
+WWW-Authenticate: Bearer resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource",
+                         scope="files:read user:profile"
+```
+
+**Example Protected Resource Metadata:**
+
+```json
+{
+  "resource": "https://mcp.example.com",
+  "authorization_servers": [
+    "https://auth.example.com",
+    "https://auth-backup.example.com"
+  ],
+  "scopes_supported": ["files:read", "files:write", "user:profile"],
+  "bearer_methods_supported": ["header"]
+}
+```
+
+**Multiple Authorization Servers:**
+
+If the protected resource metadata provides multiple authorization servers, `mcp-debug` uses the first one by default. You can specify a preferred server:
+
+```bash
+./mcp-debug --oauth \
+  --oauth-preferred-auth-server https://auth-backup.example.com \
+  --endpoint https://mcp.example.com/mcp
+```
+
+**Testing with Older Servers:**
+
+If you're connecting to an older MCP server that doesn't support RFC 9728, you can disable Protected Resource Metadata discovery:
+
+```bash
+./mcp-debug --oauth \
+  --oauth-skip-resource-metadata \
+  --endpoint https://legacy-server.com/mcp
+```
+
+When disabled, `mcp-debug` falls back to existing OAuth discovery mechanisms (via mcp-go library).
+
+**Security Note:** RFC 9728 discovery is enabled by default as it's required by the MCP specification for proper authorization server discovery and scope selection.
 
 ### OAuth Flow
 

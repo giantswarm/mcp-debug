@@ -45,6 +45,16 @@ type OAuthConfig struct {
 	// Only use this for testing with older servers that don't support RFC 8707
 	// Security: Disabling this weakens token audience binding
 	SkipResourceParam bool
+
+	// SkipResourceMetadata disables RFC 9728 Protected Resource Metadata discovery
+	// Only use this for testing with older servers that don't support RFC 9728
+	// Security: Disabling this may require manual authorization server configuration
+	SkipResourceMetadata bool
+
+	// PreferredAuthServer allows selecting a specific authorization server
+	// when multiple servers are available in the protected resource metadata
+	// If empty, the first server in the list is used
+	PreferredAuthServer string
 }
 
 // DefaultOAuthConfig returns a default OAuth configuration
