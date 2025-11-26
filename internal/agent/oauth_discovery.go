@@ -71,10 +71,8 @@ func parseWWWAuthenticate(header string) (*WWWAuthenticateChallenge, error) {
 	}
 
 	// Split scheme and parameters
+	// SplitN always returns at least one element, so no need to check len(parts) < 1
 	parts := strings.SplitN(header, " ", 2)
-	if len(parts) < 1 {
-		return nil, fmt.Errorf("invalid WWW-Authenticate header format")
-	}
 
 	challenge := &WWWAuthenticateChallenge{
 		Scheme: parts[0],
@@ -98,51 +96,64 @@ func parseWWWAuthenticate(header string) (*WWWAuthenticateChallenge, error) {
 
 // parseAuthParams parses OAuth authentication parameters from the challenge.
 // Handles both quoted and unquoted values.
+// Format: key1="value1", key2="value2", key3=value3
 func parseAuthParams(params string) map[string]string {
 	result := make(map[string]string)
 
-	// Split by comma, handling quoted strings
-	var current strings.Builder
-	var inQuotes bool
-	var key string
-	var afterEquals bool
+	// Split by comma, but respect quotes
+	parts := splitPreservingQuotes(params, ',')
 
-	for i := 0; i < len(params); i++ {
-		ch := params[i]
-
-		switch ch {
-		case '=':
-			if !inQuotes {
-				key = strings.TrimSpace(current.String())
-				current.Reset()
-				afterEquals = true
-				continue
-			}
-		case '"':
-			if afterEquals {
-				inQuotes = !inQuotes
-				continue
-			}
-		case ',':
-			if !inQuotes && afterEquals {
-				value := strings.TrimSpace(current.String())
-				if key != "" {
-					result[key] = value
-				}
-				current.Reset()
-				key = ""
-				afterEquals = false
-				continue
-			}
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
 		}
 
-		current.WriteByte(ch)
+		// Split by equals sign
+		eqIdx := strings.Index(part, "=")
+		if eqIdx == -1 {
+			continue
+		}
+
+		key := strings.TrimSpace(part[:eqIdx])
+		value := strings.TrimSpace(part[eqIdx+1:])
+
+		// Remove surrounding quotes from value if present
+		if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
+			value = value[1 : len(value)-1]
+		}
+
+		if key != "" {
+			result[key] = value
+		}
 	}
 
-	// Handle last parameter
-	if afterEquals && key != "" {
-		value := strings.TrimSpace(current.String())
-		result[key] = value
+	return result
+}
+
+// splitPreservingQuotes splits a string by delimiter but preserves quoted sections
+func splitPreservingQuotes(s string, delimiter byte) []string {
+	var result []string
+	var current strings.Builder
+	inQuotes := false
+
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+
+		if ch == '"' {
+			inQuotes = !inQuotes
+			current.WriteByte(ch)
+		} else if ch == delimiter && !inQuotes {
+			result = append(result, current.String())
+			current.Reset()
+		} else {
+			current.WriteByte(ch)
+		}
+	}
+
+	// Add last segment
+	if current.Len() > 0 {
+		result = append(result, current.String())
 	}
 
 	return result
@@ -158,9 +169,7 @@ func parseAuthParams(params string) map[string]string {
 func discoverProtectedResourceMetadata(ctx context.Context, endpoint string, challenge *WWWAuthenticateChallenge, logger *Logger) (*ProtectedResourceMetadata, error) {
 	// Priority 1: Use resource_metadata URL from WWW-Authenticate header
 	if challenge != nil && challenge.ResourceMetadataURL != "" {
-		if logger != nil && logger.verbose {
-			logger.Info("Using resource_metadata URL from WWW-Authenticate: %s", challenge.ResourceMetadataURL)
-		}
+		logger.InfoVerbose("Using resource_metadata URL from WWW-Authenticate: %s", challenge.ResourceMetadataURL)
 		return fetchProtectedResourceMetadata(ctx, challenge.ResourceMetadataURL)
 	}
 
@@ -171,15 +180,11 @@ func discoverProtectedResourceMetadata(ctx context.Context, endpoint string, cha
 	}
 
 	for i, uri := range wellKnownURIs {
-		if logger != nil && logger.verbose {
-			logger.Info("Trying well-known URI (%d/%d): %s", i+1, len(wellKnownURIs), uri)
-		}
+		logger.InfoVerbose("Trying well-known URI (%d/%d): %s", i+1, len(wellKnownURIs), uri)
 
 		metadata, err := fetchProtectedResourceMetadata(ctx, uri)
 		if err != nil {
-			if logger != nil && logger.verbose {
-				logger.Warning("Failed to fetch from %s: %v", uri, err)
-			}
+			logger.WarningVerbose("Failed to fetch from %s: %v", uri, err)
 			continue
 		}
 
@@ -286,6 +291,7 @@ func fetchProtectedResourceMetadata(ctx context.Context, metadataURL string) (*P
 }
 
 // validateProtectedResourceMetadata validates that required fields are present
+// and that authorization server URLs are valid absolute HTTP(S) URLs per RFC 9728.
 func validateProtectedResourceMetadata(metadata *ProtectedResourceMetadata) error {
 	if metadata.Resource == "" {
 		return fmt.Errorf("missing required field: resource")
@@ -296,9 +302,23 @@ func validateProtectedResourceMetadata(metadata *ProtectedResourceMetadata) erro
 	}
 
 	// Validate authorization server URLs
+	// Per RFC 9728, authorization servers must be absolute URLs with http or https scheme
 	for i, asURL := range metadata.AuthorizationServers {
-		if _, err := url.Parse(asURL); err != nil {
+		parsed, err := url.Parse(asURL)
+		if err != nil {
 			return fmt.Errorf("invalid authorization server URL at index %d: %w", i, err)
+		}
+
+		if !parsed.IsAbs() {
+			return fmt.Errorf("authorization server URL at index %d must be absolute: %s", i, asURL)
+		}
+
+		if parsed.Scheme != "https" && parsed.Scheme != "http" {
+			return fmt.Errorf("authorization server URL at index %d must use http or https scheme: %s", i, asURL)
+		}
+
+		if parsed.Host == "" {
+			return fmt.Errorf("authorization server URL at index %d missing host: %s", i, asURL)
 		}
 	}
 
@@ -307,6 +327,13 @@ func validateProtectedResourceMetadata(metadata *ProtectedResourceMetadata) erro
 
 // selectAuthorizationServer selects an authorization server from the metadata
 // based on configuration preferences.
+//
+// If preferredServer is specified and found in metadata.AuthorizationServers,
+// it is returned. Otherwise, the first server in the list is returned per
+// RFC 9728 Section 3 recommendation.
+//
+// Returns an error if no authorization servers are available or if the
+// preferred server is not found in the list.
 func selectAuthorizationServer(metadata *ProtectedResourceMetadata, preferredServer string) (string, error) {
 	if len(metadata.AuthorizationServers) == 0 {
 		return "", fmt.Errorf("no authorization servers available")

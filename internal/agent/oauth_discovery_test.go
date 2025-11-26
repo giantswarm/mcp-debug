@@ -148,6 +148,39 @@ func TestParseAuthParams(t *testing.T) {
 				"key3": "value3",
 			},
 		},
+		{
+			name:   "unquoted values",
+			params: `key1=value1, key2=value2`,
+			want: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+		},
+		{
+			name:   "empty params",
+			params: "",
+			want:   map[string]string{},
+		},
+		{
+			name:   "malformed - no equals",
+			params: "key1 key2",
+			want:   map[string]string{},
+		},
+		{
+			name:   "single parameter",
+			params: `key="value"`,
+			want: map[string]string{
+				"key": "value",
+			},
+		},
+		{
+			name:   "comma in quoted value",
+			params: `desc="value, with comma", key2="val2"`,
+			want: map[string]string{
+				"desc": "value, with comma",
+				"key2": "val2",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -166,6 +199,69 @@ func TestParseAuthParams(t *testing.T) {
 				}
 				if gotValue != wantValue {
 					t.Errorf("param %q = %q, want %q", key, gotValue, wantValue)
+				}
+			}
+		})
+	}
+}
+
+func TestSplitPreservingQuotes(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		delimiter byte
+		want      []string
+	}{
+		{
+			name:      "simple split",
+			input:     "a,b,c",
+			delimiter: ',',
+			want:      []string{"a", "b", "c"},
+		},
+		{
+			name:      "quoted value with delimiter",
+			input:     `a,"b,c",d`,
+			delimiter: ',',
+			want:      []string{"a", `"b,c"`, "d"},
+		},
+		{
+			name:      "multiple quoted values",
+			input:     `"a,b","c,d","e"`,
+			delimiter: ',',
+			want:      []string{`"a,b"`, `"c,d"`, `"e"`},
+		},
+		{
+			name:      "empty string",
+			input:     "",
+			delimiter: ',',
+			want:      []string{},
+		},
+		{
+			name:      "no delimiter",
+			input:     "abc",
+			delimiter: ',',
+			want:      []string{"abc"},
+		},
+		{
+			name:      "unmatched quotes",
+			input:     `a,"b,c`,
+			delimiter: ',',
+			want:      []string{"a", `"b,c`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitPreservingQuotes(tt.input, tt.delimiter)
+
+			if len(got) != len(tt.want) {
+				t.Errorf("got %d parts, want %d\ngot: %v\nwant: %v", len(got), len(tt.want), got, tt.want)
+				return
+			}
+
+			for i, part := range got {
+				if part != tt.want[i] {
+					t.Errorf("part[%d] = %q, want %q", i, part, tt.want[i])
 				}
 			}
 		})
@@ -389,6 +485,15 @@ func TestValidateProtectedResourceMetadata(t *testing.T) {
 			},
 		},
 		{
+			name: "valid metadata with http scheme",
+			metadata: &ProtectedResourceMetadata{
+				Resource: "https://mcp.example.com",
+				AuthorizationServers: []string{
+					"http://localhost:8080",
+				},
+			},
+		},
+		{
 			name: "missing resource",
 			metadata: &ProtectedResourceMetadata{
 				AuthorizationServers: []string{
@@ -411,6 +516,36 @@ func TestValidateProtectedResourceMetadata(t *testing.T) {
 				Resource: "https://mcp.example.com",
 				AuthorizationServers: []string{
 					"not a valid url://",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "relative authorization server URL",
+			metadata: &ProtectedResourceMetadata{
+				Resource: "https://mcp.example.com",
+				AuthorizationServers: []string{
+					"/auth/oauth",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid scheme in authorization server URL",
+			metadata: &ProtectedResourceMetadata{
+				Resource: "https://mcp.example.com",
+				AuthorizationServers: []string{
+					"ftp://auth.example.com",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing host in authorization server URL",
+			metadata: &ProtectedResourceMetadata{
+				Resource: "https://mcp.example.com",
+				AuthorizationServers: []string{
+					"https://",
 				},
 			},
 			wantErr: true,
