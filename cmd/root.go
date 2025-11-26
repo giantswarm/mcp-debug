@@ -44,6 +44,8 @@ var (
 	oauthDisableStepUp     bool
 	oauthStepUpMaxRetries  int
 	oauthStepUpPrompt      bool
+	oauthClientIDMetaURL   string
+	oauthDisableCIMD       bool
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -130,6 +132,8 @@ func init() {
 	rootCmd.Flags().BoolVar(&oauthDisableStepUp, "oauth-disable-step-up", false, "Disable automatic step-up authorization for insufficient_scope errors")
 	rootCmd.Flags().IntVar(&oauthStepUpMaxRetries, "oauth-step-up-max-retries", 2, "Maximum number of step-up authorization retry attempts")
 	rootCmd.Flags().BoolVar(&oauthStepUpPrompt, "oauth-step-up-prompt", false, "Prompt user before requesting additional scopes during step-up authorization")
+	rootCmd.Flags().StringVar(&oauthClientIDMetaURL, "oauth-client-id-metadata-url", "", "HTTPS URL hosting Client ID Metadata Document (enables CIMD support)")
+	rootCmd.Flags().BoolVar(&oauthDisableCIMD, "oauth-disable-cimd", false, "Disable Client ID Metadata Documents (falls back to DCR or manual registration)")
 
 	// Add subcommands
 	rootCmd.AddCommand(newSelfUpdateCmd())
@@ -193,6 +197,8 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 			EnableStepUpAuth:     !oauthDisableStepUp,
 			StepUpMaxRetries:     oauthStepUpMaxRetries,
 			StepUpUserPrompt:     oauthStepUpPrompt,
+			ClientIDMetadataURL:  oauthClientIDMetaURL,
+			DisableCIMD:          oauthDisableCIMD,
 		}
 
 		// Apply defaults for any unset fields
