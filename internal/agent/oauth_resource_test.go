@@ -249,7 +249,7 @@ func TestResourceRoundTripper(t *testing.T) {
 			if err != nil {
 				t.Fatalf("request failed: %v", err)
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 
 			// Verify resource parameter
 			resourceValue, err := getResourceParam(capturedReq)
@@ -356,7 +356,7 @@ func TestResourceRoundTripperIntegration(t *testing.T) {
 		}
 		capturedRequests = append(capturedRequests, reqCopy)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"access_token": "test-token"}`))
+		_, _ = w.Write([]byte(`{"access_token": "test-token"}`))
 	}))
 	defer server.Close()
 
@@ -372,7 +372,7 @@ func TestResourceRoundTripperIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("authorization request failed: %v", err)
 	}
-	resp1.Body.Close()
+	_ = resp1.Body.Close()
 
 	// Simulate token request
 	tokenReq, _ := http.NewRequest(http.MethodPost,
@@ -383,7 +383,7 @@ func TestResourceRoundTripperIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("token request failed: %v", err)
 	}
-	resp2.Body.Close()
+	_ = resp2.Body.Close()
 
 	// Verify both requests have resource parameter
 	if len(capturedRequests) != 2 {

@@ -252,7 +252,7 @@ func TestCallbackServerIntegration(t *testing.T) {
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		server.Shutdown(ctx)
+		_ = server.Shutdown(ctx)
 	}()
 
 	// Give server time to start
@@ -264,7 +264,7 @@ func TestCallbackServerIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to make callback request: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -305,7 +305,7 @@ func TestCallbackServerErrorHandling(t *testing.T) {
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		server.Shutdown(ctx)
+		_ = server.Shutdown(ctx)
 	}()
 
 	// Give server time to start
@@ -320,7 +320,7 @@ func TestCallbackServerErrorHandling(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to make callback request: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected status 400, got %d", resp.StatusCode)
@@ -358,7 +358,7 @@ func TestCallbackServerMethodRestriction(t *testing.T) {
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		server.Shutdown(ctx)
+		_ = server.Shutdown(ctx)
 	}()
 
 	// Give server time to start
@@ -370,7 +370,7 @@ func TestCallbackServerMethodRestriction(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to make POST request: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusMethodNotAllowed {
 			t.Errorf("Expected status 405, got %d", resp.StatusCode)
@@ -441,7 +441,7 @@ func TestCallbackServerSecurityTimeouts(t *testing.T) {
 	// Cleanup
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	server.Shutdown(ctx)
+	_ = server.Shutdown(ctx)
 }
 
 func TestCallbackHandlerConcurrentRequests(t *testing.T) {

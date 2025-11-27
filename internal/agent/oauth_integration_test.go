@@ -65,7 +65,7 @@ func TestOAuthEndToEndFlow(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to reach AS metadata endpoint: %v", err)
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("AS metadata status = %d, want %d", resp.StatusCode, http.StatusOK)
@@ -162,7 +162,7 @@ func TestResourceRoundTripperE2E(t *testing.T) {
 	if err != nil {
 		t.Fatalf("authorization request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Verify redirect received
 	if resp.StatusCode != http.StatusFound {
@@ -231,7 +231,7 @@ func TestRegistrationTokenRoundTripper_Integration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("registration request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		t.Errorf("registration status = %d, want %d", resp.StatusCode, http.StatusCreated)

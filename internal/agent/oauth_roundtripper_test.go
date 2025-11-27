@@ -133,7 +133,7 @@ func TestRegistrationTokenRoundTripper(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Read and discard the response body
 			_, _ = io.ReadAll(resp.Body)
@@ -197,7 +197,7 @@ func TestRegistrationTokenRoundTripper_RequestCloning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	_, _ = io.ReadAll(resp.Body)
 
 	// Verify the original request was not modified
@@ -231,7 +231,7 @@ func TestRegistrationTokenRoundTripper_HTTPSEnforcement(t *testing.T) {
 
 	resp, err := client.Do(req)
 	if err == nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		t.Fatal("Expected error due to HTTP (not HTTPS) scheme, but got none")
 	}
 
@@ -266,7 +266,7 @@ func TestRegistrationTokenRoundTripper_HeaderConflict(t *testing.T) {
 
 	resp, err := client.Do(req)
 	if err == nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		t.Fatal("Expected error due to existing Authorization header, but got none")
 	}
 
@@ -355,7 +355,7 @@ func TestRegistrationTokenRoundTripper_NonRegistrationEndpoints(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			_, _ = io.ReadAll(resp.Body)
 
 			// Verify NO Authorization header was added

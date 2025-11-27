@@ -72,7 +72,7 @@ func (l *Logger) colorize(text, colorCode string) string {
 // Info logs an informational message
 func (l *Logger) Info(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(l.writer, "[%s] %s\n", l.timestamp(), msg)
+	_, _ = fmt.Fprintf(l.writer, "[%s] %s\n", l.timestamp(), msg)
 }
 
 // Debug logs a debug message (only in verbose mode)
@@ -81,25 +81,25 @@ func (l *Logger) Debug(format string, args ...interface{}) {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(l.writer, "[%s] %s\n", l.timestamp(), l.colorize(msg, colorGray))
+	_, _ = fmt.Fprintf(l.writer, "[%s] %s\n", l.timestamp(), l.colorize(msg, colorGray))
 }
 
 // Error logs an error message
 func (l *Logger) Error(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(l.writer, "[%s] %s\n", l.timestamp(), l.colorize(msg, colorRed))
+	_, _ = fmt.Fprintf(l.writer, "[%s] %s\n", l.timestamp(), l.colorize(msg, colorRed))
 }
 
 // Success logs a success message
 func (l *Logger) Success(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(l.writer, "[%s] %s\n", l.timestamp(), l.colorize(msg, colorGreen))
+	_, _ = fmt.Fprintf(l.writer, "[%s] %s\n", l.timestamp(), l.colorize(msg, colorGreen))
 }
 
 // Warning logs a warning message with yellow highlighting
 func (l *Logger) Warning(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(l.writer, "[%s] %s\n", l.timestamp(), l.colorize(msg, colorYellow))
+	_, _ = fmt.Fprintf(l.writer, "[%s] %s\n", l.timestamp(), l.colorize(msg, colorYellow))
 }
 
 // InfoVerbose logs an informational message only in verbose mode
@@ -139,14 +139,14 @@ func (l *Logger) Request(method string, params interface{}) {
 	arrow := l.colorize("→", colorBlue)
 	methodStr := l.colorize(fmt.Sprintf("REQUEST (%s)", method), colorBlue)
 
-	fmt.Fprintf(l.writer, "[%s] %s %s:\n", l.timestamp(), arrow, methodStr)
+	_, _ = fmt.Fprintf(l.writer, "[%s] %s %s:\n", l.timestamp(), arrow, methodStr)
 
 	// Pretty print the params
 	if params != nil {
 		jsonStr := l.prettyJSON(params)
-		fmt.Fprintln(l.writer, l.colorize(jsonStr, colorBlue))
+		_, _ = fmt.Fprintln(l.writer, l.colorize(jsonStr, colorBlue))
 	}
-	fmt.Fprintln(l.writer)
+	_, _ = fmt.Fprintln(l.writer)
 }
 
 // Response logs an incoming response
@@ -199,14 +199,14 @@ func (l *Logger) Response(method string, result interface{}) {
 	arrow := l.colorize("←", colorGreen)
 	methodStr := l.colorize(fmt.Sprintf("RESPONSE (%s)", method), colorGreen)
 
-	fmt.Fprintf(l.writer, "[%s] %s %s:\n", l.timestamp(), arrow, methodStr)
+	_, _ = fmt.Fprintf(l.writer, "[%s] %s %s:\n", l.timestamp(), arrow, methodStr)
 
 	// Pretty print the result
 	if result != nil {
 		jsonStr := l.prettyJSON(result)
-		fmt.Fprintln(l.writer, l.colorize(jsonStr, colorGreen))
+		_, _ = fmt.Fprintln(l.writer, l.colorize(jsonStr, colorGreen))
 	}
-	fmt.Fprintln(l.writer)
+	_, _ = fmt.Fprintln(l.writer)
 }
 
 // Notification logs an incoming notification
@@ -237,14 +237,14 @@ func (l *Logger) Notification(method string, params interface{}) {
 	arrow := l.colorize("←", colorYellow)
 	methodStr := l.colorize(fmt.Sprintf("NOTIFICATION (%s)", method), colorYellow)
 
-	fmt.Fprintf(l.writer, "[%s] %s %s:\n", l.timestamp(), arrow, methodStr)
+	_, _ = fmt.Fprintf(l.writer, "[%s] %s %s:\n", l.timestamp(), arrow, methodStr)
 
 	// Pretty print the params
 	if params != nil {
 		jsonStr := l.prettyJSON(params)
-		fmt.Fprintln(l.writer, l.colorize(jsonStr, colorYellow))
+		_, _ = fmt.Fprintln(l.writer, l.colorize(jsonStr, colorYellow))
 	}
-	fmt.Fprintln(l.writer)
+	_, _ = fmt.Fprintln(l.writer)
 }
 
 // prettyJSON formats JSON for display

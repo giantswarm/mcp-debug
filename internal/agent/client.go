@@ -62,7 +62,7 @@ func (c *Client) Run(ctx context.Context) error {
 func (c *Client) Reconnect(ctx context.Context) error {
 	c.logger.Info("Attempting to reconnect to MCP server...")
 	if c.client != nil {
-		c.client.Close()
+		_ = c.client.Close() // Explicitly ignore close error during reconnect
 	}
 	return c.connectAndInitialize(ctx)
 }
@@ -190,7 +190,7 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 		}
 
 		// Build HTTP client with custom round trippers
-		var transport http.RoundTripper = http.DefaultTransport
+		transport := http.DefaultTransport
 
 		// Add registration token round tripper if needed
 		if c.oauthConfig.RegistrationToken != "" {
@@ -662,11 +662,6 @@ func PrettyJSON(v interface{}) string {
 		return fmt.Sprintf("%+v", v)
 	}
 	return string(b)
-}
-
-// prettyJSON is a wrapper for backward compatibility
-func prettyJSON(v interface{}) string {
-	return PrettyJSON(v)
 }
 
 // Helper methods to check server capabilities

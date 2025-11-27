@@ -51,7 +51,7 @@ func (r *REPL) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create readline instance: %w", err)
 	}
-	defer rl.Close()
+	defer func() { _ = rl.Close() }()
 	r.rl = rl
 
 	// Start notification listener in background
@@ -237,7 +237,7 @@ func (r *REPL) notificationListener(ctx context.Context) {
 		case notification := <-r.client.notificationChan:
 			// Temporarily pause readline
 			if r.rl != nil {
-				r.rl.Stdout().Write([]byte("\r\033[K"))
+				_, _ = r.rl.Stdout().Write([]byte("\r\033[K"))
 			}
 
 			// Handle the notification (this will log it)

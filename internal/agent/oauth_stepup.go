@@ -180,7 +180,7 @@ func (rt *stepUpRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 				rt.config.StepUpMaxRetries, req.Method, req.URL.Path)
 		}
 		// Close original response body
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("max step-up authorization retries (%d) exceeded for %s %s (attempts: %d)",
 			rt.config.StepUpMaxRetries, req.Method, req.URL.Path, attempts)
 	}
@@ -196,7 +196,7 @@ func (rt *stepUpRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		if rt.logger != nil {
 			rt.logger.Warning("Insufficient_scope error without scope parameter - cannot determine required scopes")
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("insufficient_scope error without scope parameter")
 	}
 
@@ -215,7 +215,7 @@ func (rt *stepUpRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		if rt.logger != nil {
 			rt.logger.Warning("Suspicious scope request detected: %v", err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("scope validation failed: %w", err)
 	}
 
@@ -225,13 +225,13 @@ func (rt *stepUpRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 			if rt.logger != nil {
 				rt.logger.Info("User declined step-up authorization")
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			return nil, fmt.Errorf("user declined step-up authorization")
 		}
 	}
 
 	// Close original response body before re-authorization
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// Trigger re-authorization with new scopes
 	if rt.logger != nil {

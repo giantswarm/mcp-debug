@@ -251,7 +251,7 @@ func fetchProtectedResourceMetadata(ctx context.Context, metadataURL string) (*P
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch metadata: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check response status
 	if resp.StatusCode != http.StatusOK {

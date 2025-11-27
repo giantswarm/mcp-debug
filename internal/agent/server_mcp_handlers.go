@@ -58,12 +58,12 @@ func (m *MCPServer) handleDescribeTool(ctx context.Context, request mcp.CallTool
 	// Get tool name from arguments
 	args, ok := request.Params.Arguments.(map[string]interface{})
 	if !ok {
-		return mcp.NewToolResultError(fmt.Sprintf("invalid arguments type")), nil
+		return mcp.NewToolResultError("invalid arguments type"), nil
 	}
 
 	name, ok := args["name"].(string)
 	if !ok || name == "" {
-		return mcp.NewToolResultError(fmt.Sprintf("missing or invalid 'name' argument")), nil
+		return mcp.NewToolResultError("missing or invalid 'name' argument"), nil
 	}
 
 	// Find the tool
@@ -95,12 +95,12 @@ func (m *MCPServer) handleDescribeResource(ctx context.Context, request mcp.Call
 	// Get resource URI from arguments
 	args, ok := request.Params.Arguments.(map[string]interface{})
 	if !ok {
-		return mcp.NewToolResultError(fmt.Sprintf("invalid arguments type")), nil
+		return mcp.NewToolResultError("invalid arguments type"), nil
 	}
 
 	uri, ok := args["uri"].(string)
 	if !ok || uri == "" {
-		return mcp.NewToolResultError(fmt.Sprintf("missing or invalid 'uri' argument")), nil
+		return mcp.NewToolResultError("missing or invalid 'uri' argument"), nil
 	}
 
 	// Find the resource
@@ -132,12 +132,12 @@ func (m *MCPServer) handleDescribePrompt(ctx context.Context, request mcp.CallTo
 	// Get prompt name from arguments
 	args, ok := request.Params.Arguments.(map[string]interface{})
 	if !ok {
-		return mcp.NewToolResultError(fmt.Sprintf("invalid arguments type")), nil
+		return mcp.NewToolResultError("invalid arguments type"), nil
 	}
 
 	name, ok := args["name"].(string)
 	if !ok || name == "" {
-		return mcp.NewToolResultError(fmt.Sprintf("missing or invalid 'name' argument")), nil
+		return mcp.NewToolResultError("missing or invalid 'name' argument"), nil
 	}
 
 	// Find the prompt
@@ -169,12 +169,12 @@ func (m *MCPServer) handleCallTool(ctx context.Context, request mcp.CallToolRequ
 	// Get arguments
 	args, ok := request.Params.Arguments.(map[string]interface{})
 	if !ok {
-		return mcp.NewToolResultError(fmt.Sprintf("invalid arguments type")), nil
+		return mcp.NewToolResultError("invalid arguments type"), nil
 	}
 
 	toolName, ok := args["name"].(string)
 	if !ok || toolName == "" {
-		return mcp.NewToolResultError(fmt.Sprintf("missing or invalid 'name' argument")), nil
+		return mcp.NewToolResultError("missing or invalid 'name' argument"), nil
 	}
 
 	// Get tool arguments (optional)
@@ -203,12 +203,12 @@ func (m *MCPServer) handleGetResource(ctx context.Context, request mcp.CallToolR
 	// Get resource URI from arguments
 	args, ok := request.Params.Arguments.(map[string]interface{})
 	if !ok {
-		return mcp.NewToolResultError(fmt.Sprintf("invalid arguments type")), nil
+		return mcp.NewToolResultError("invalid arguments type"), nil
 	}
 
 	uri, ok := args["uri"].(string)
 	if !ok || uri == "" {
-		return mcp.NewToolResultError(fmt.Sprintf("missing or invalid 'uri' argument")), nil
+		return mcp.NewToolResultError("missing or invalid 'uri' argument"), nil
 	}
 
 	// Get the resource
@@ -231,12 +231,12 @@ func (m *MCPServer) handleGetPrompt(ctx context.Context, request mcp.CallToolReq
 	// Get arguments
 	args, ok := request.Params.Arguments.(map[string]interface{})
 	if !ok {
-		return mcp.NewToolResultError(fmt.Sprintf("invalid arguments type")), nil
+		return mcp.NewToolResultError("invalid arguments type"), nil
 	}
 
 	promptName, ok := args["name"].(string)
 	if !ok || promptName == "" {
-		return mcp.NewToolResultError(fmt.Sprintf("missing or invalid 'name' argument")), nil
+		return mcp.NewToolResultError("missing or invalid 'name' argument"), nil
 	}
 
 	// Get prompt arguments (optional)

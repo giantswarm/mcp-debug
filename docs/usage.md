@@ -18,6 +18,7 @@ This guide covers the main functionalities and how to use them.
     - [3. MCP Server Mode (AI Assistant Integration)](#3-mcp-server-mode-ai-assistant-integration)
   - [Transport Protocols](#transport-protocols)
   - [OAuth Authentication](#oauth-authentication)
+    - [OAuth Documentation](#oauth-documentation)
     - [Basic OAuth Usage](#basic-oauth-usage)
     - [OAuth Flags](#oauth-flags)
     - [OAuth Flow](#oauth-flow)
@@ -187,6 +188,23 @@ You can specify the server transport using the `--server-transport` flag.
 
 `mcp-debug` supports OAuth 2.1 authentication for connecting to protected MCP servers. This allows you to debug servers that require user authorization.
 
+### OAuth Documentation
+
+For complete OAuth 2.1 documentation, see the **[OAuth Documentation](oauth/)** which includes:
+
+- **[Overview & Quick Start](oauth/README.md)** - Get started with OAuth
+- **[Discovery](oauth/discovery.md)** - Automatic authorization server and scope discovery (RFC 9728, RFC 8414)
+- **[Resource Indicators](oauth/resource-indicators.md)** - Token audience binding (RFC 8707)
+- **[Scopes](oauth/scopes.md)** - Scope selection modes and step-up authorization
+- **[Client Registration](oauth/client-registration.md)** - Pre-registration, CIMD, and Dynamic Client Registration
+- **[Security](oauth/security.md)** - Security features, PKCE, and best practices
+- **[Testing](oauth/testing.md)** - Compatibility flags for legacy servers
+- **[Configuration](oauth/configuration.md)** - Complete reference for all OAuth options
+- **[Troubleshooting](oauth/troubleshooting.md)** - Common issues and solutions
+- **[Examples](oauth/examples/)** - Step-by-step tutorials
+
+The sections below provide a quick reference. For detailed information, consult the full OAuth documentation.
+
 ### Basic OAuth Usage
 
 **With Pre-Registered Client Credentials:**
@@ -261,8 +279,6 @@ If you need to rotate your registration token:
 | `--oauth-skip-resource-param` | Skip RFC 8707 resource parameter (for testing older servers) | `false` |
 | `--oauth-skip-resource-metadata` | Skip RFC 9728 Protected Resource Metadata discovery (for testing) | `false` |
 | `--oauth-preferred-auth-server` | Preferred authorization server URL when multiple are available | |
-| `--oauth-skip-pkce-validation` | Skip PKCE support validation in AS metadata (DANGEROUS - testing only) | `false` |
-| `--oauth-skip-auth-server-discovery` | Skip RFC 8414 AS Metadata discovery (for testing) | `false` |
 
 ### RFC 8707 Resource Indicators
 
@@ -403,11 +419,8 @@ If you need to test with an older authorization server that supports PKCE but do
 
 ```bash
 ./mcp-debug --oauth \
-  --oauth-skip-pkce-validation \
   --endpoint https://legacy-auth-server.com/mcp
 ```
-
-**Warning:** The `--oauth-skip-pkce-validation` flag weakens security and should only be used for testing. PKCE is a critical security feature that prevents authorization code interception attacks.
 
 **Disabling AS Metadata Discovery:**
 
@@ -415,7 +428,6 @@ For testing with older servers or pre-configured endpoints:
 
 ```bash
 ./mcp-debug --oauth \
-  --oauth-skip-auth-server-discovery \
   --endpoint https://legacy-server.com/mcp
 ```
 

@@ -201,7 +201,7 @@ func TestPKCEIntegrationWithMockServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("authorization request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Verify we got a redirect
 	if resp.StatusCode != http.StatusFound {
@@ -240,7 +240,7 @@ func TestPKCEIntegrationWithMockServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("token request failed: %v", err)
 	}
-	defer tokenResp.Body.Close()
+	defer func() { _ = tokenResp.Body.Close() }()
 
 	if tokenResp.StatusCode != http.StatusOK {
 		t.Errorf("token request status = %d, want %d", tokenResp.StatusCode, http.StatusOK)
@@ -290,7 +290,7 @@ func TestPKCERequiredByServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should get error response
 	if resp.StatusCode != http.StatusBadRequest {
@@ -348,7 +348,7 @@ func TestPKCEMethodValidation(t *testing.T) {
 			if err != nil {
 				t.Fatalf("request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			isAccepted := resp.StatusCode == http.StatusFound
 			if isAccepted != tt.wantAccepted {
@@ -373,7 +373,7 @@ func TestPKCEMethodValidation(t *testing.T) {
 				if err != nil {
 					t.Fatalf("token request failed: %v", err)
 				}
-				defer tokenResp.Body.Close()
+				defer func() { _ = tokenResp.Body.Close() }()
 
 				if tokenResp.StatusCode != http.StatusOK {
 					t.Errorf("token exchange failed with status %d", tokenResp.StatusCode)
