@@ -498,18 +498,15 @@ ERROR: Per MCP spec, PKCE is required for security
 curl https://auth.example.com/.well-known/oauth-authorization-server | jq .code_challenge_methods_supported
 ```
 
-**Solution 1:** Server needs to advertise PKCE support
+**Important:** PKCE is **mandatory** per MCP specification. There is no bypass.
 
-Report to server operator.
+**Actions:**
 
-**Solution 2:** Bypass validation (testing only):
+1. **Report to server operator** - PKCE with S256 method is required
+2. **Check server documentation** - Verify actual PKCE support
+3. **Request metadata update** - Server must advertise `code_challenge_methods_supported: ["S256"]`
 
-```bash
-./mcp-debug --oauth \
-  --endpoint https://mcp.example.com/mcp
-```
-
-**Warning:** Only for testing. PKCE is a critical security feature.
+If the authorization server doesn't support PKCE, you cannot connect to MCP servers through it.
 
 ### "HTTPS redirect URIs not supported"
 

@@ -358,23 +358,6 @@ export OAUTH_REGISTRATION_TOKEN="your-token"
   --endpoint https://mcp.example.com/mcp
 ```
 
-**Configuration Files**:
-
-```json
-{
-  "oauth": {
-    "client_id": "your-id",
-    "client_secret": "your-secret"
-  }
-}
-```
-
-```bash
-chmod 600 oauth-config.json  # Protect file
-./mcp-debug --oauth --config oauth-config.json \
-  --endpoint https://mcp.example.com/mcp
-```
-
 **Avoid Command-Line Arguments**:
 
 ```bash

@@ -68,36 +68,29 @@ ERROR: Protected Resource Metadata not available
 
 ### Scenario 3: PKCE Not Advertised
 
-**Problem:** Server supports PKCE but doesn't advertise it
+**Problem:** Server doesn't advertise PKCE support
 
 **Error:**
 
 ```
 ERROR: Authorization server does not advertise PKCE support
 ERROR: code_challenge_methods_supported: []
+ERROR: Per MCP spec, PKCE is required for security
 ```
 
-**Solution:**
+**Important:** PKCE is **mandatory** per MCP specification. There is no bypass flag.
 
-```bash
-./mcp-debug --oauth \
-  --endpoint https://legacy-server.com/mcp
-```
+**Actions:**
 
-**Security impact:** **CRITICAL** - May connect without PKCE
+1. **Report to server operator** - PKCE with S256 method is required
+2. **Check server documentation** - Verify if server actually supports PKCE
+3. **Request metadata update** - Server should advertise `code_challenge_methods_supported: ["S256"]`
 
-**Verify:** Check if server actually supports PKCE by examining logs:
+**Security Note:** If the authorization server doesn't support PKCE, you cannot connect to MCP servers through it. This is a security requirement, not an optional feature.
 
-```
-[INFO] Authorization request includes code_challenge
-[INFO] ✓ Access token obtained (PKCE succeeded)
-```
+### Scenario 4: Multiple Features Missing
 
-If PKCE works, report to server operator to update metadata.
-
-### Scenario 4: All Features Missing
-
-**Problem:** Very old OAuth server
+**Problem:** Old OAuth server missing multiple modern features
 
 **Solution:**
 
@@ -107,10 +100,12 @@ If PKCE works, report to server operator to update metadata.
   --oauth-skip-resource-metadata \
   --oauth-client-id "pre-registered-client" \
   --oauth-client-secret "$CLIENT_SECRET" \
-  --endpoint https://very-legacy-server.com/mcp
+  --endpoint https://legacy-server.com/mcp
 ```
 
-**Security impact:** **CRITICAL** - Minimal OAuth security
+**Security impact:** **HIGH** - Reduced OAuth security
+
+**Note:** PKCE support is still required. If the authorization server doesn't support PKCE, you cannot proceed - see Scenario 3.
 
 ## Step-by-Step Testing Process
 
@@ -137,15 +132,6 @@ Add compatibility flags one at a time:
 ```
 
 **Test 2: Skip resource metadata**
-
-```bash
-./mcp-debug --oauth --verbose \
-  --oauth-skip-resource-param \
-  --oauth-skip-resource-metadata \
-  --endpoint https://server.example.com/mcp
-```
-
-**Test 3: Skip PKCE validation**
 
 ```bash
 ./mcp-debug --oauth --verbose \
@@ -184,7 +170,7 @@ Create a compatibility report:
 
 ### Recommendations
 
-1. Update server to advertise PKCE support
+1. Update server to advertise PKCE support (required by MCP spec)
 2. Implement RFC 8707 resource indicators
 3. Implement RFC 9728 protected resource metadata
 4. Enable RFC 7591 dynamic client registration
@@ -295,16 +281,19 @@ ERROR: Token request failed: invalid_client
 
 ### Multiple Compatibility Flags Still Fail
 
-If the server fails even with all compatibility flags:
+If the server fails even with all available compatibility flags:
 
 ```bash
 ./mcp-debug --oauth --verbose \
   --oauth-skip-resource-param \
   --oauth-skip-resource-metadata \
+  --oauth-preferred-auth-server https://auth.example.com \
   --oauth-client-id "$CLIENT_ID" \
   --oauth-client-secret "$CLIENT_SECRET" \
   --endpoint https://server.com/mcp
 ```
+
+**Note:** PKCE support is mandatory - if the authorization server doesn't support PKCE with S256 method, you cannot proceed.
 
 The server may have custom OAuth implementation. Contact server operator.
 

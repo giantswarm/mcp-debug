@@ -5,8 +5,7 @@ Complete reference for all OAuth 2.1 configuration options in `mcp-debug`.
 ## Table of Contents
 
 - [Command-Line Flags](#command-line-flags)
-- [Configuration File](#configuration-file)
-- [Environment Variables](#environment-variables)
+- [Using Environment Variables](#using-environment-variables)
 - [OAuthConfig Structure](#oauthconfig-structure)
 - [Default Values](#default-values)
 - [Validation Rules](#validation-rules)
@@ -66,46 +65,13 @@ Complete reference for all OAuth 2.1 configuration options in `mcp-debug`.
 | `--oauth-skip-resource-param` | boolean | Skip RFC 8707 resource parameter | `false` | **HIGH** |
 | `--oauth-skip-resource-metadata` | boolean | Skip RFC 9728 Protected Resource Metadata discovery | `false` | **MEDIUM** |
 
-## Configuration File
+## Using Environment Variables
 
-While `mcp-debug` primarily uses command-line flags, you can create a configuration file for complex setups.
+Store sensitive credentials in environment variables to avoid exposing them in command history or process listings.
 
-### Example oauth-config.json
+**Important:** `mcp-debug` does **not** automatically read environment variables. You must explicitly pass them to the command-line flags using shell variable expansion (e.g., `$VARIABLE_NAME` or `"$VARIABLE_NAME"`).
 
-```json
-{
-  "oauth": {
-    "enabled": true,
-    "client_id": "your-client-id",
-    "client_secret": "your-client-secret",
-    "redirect_url": "http://localhost:8765/callback",
-    "scopes": ["mcp:read", "mcp:write"],
-    "scope_mode": "auto",
-    "use_pkce": true,
-    "timeout": "5m",
-    "enable_step_up": true,
-    "step_up_max_retries": 2
-  }
-}
-```
-
-**Usage:**
-
-```bash
-./mcp-debug --config oauth-config.json --endpoint https://mcp.example.com/mcp
-```
-
-**Security:** Protect configuration files containing secrets:
-
-```bash
-chmod 600 oauth-config.json
-```
-
-## Environment Variables
-
-Store sensitive credentials in environment variables:
-
-### Supported Variables
+### Recommended Variables
 
 | Variable | Description | Example |
 |----------|-------------|---------|
@@ -116,14 +82,22 @@ Store sensitive credentials in environment variables:
 ### Usage
 
 ```bash
+# Set environment variables
 export OAUTH_CLIENT_ID="your-client-id"
 export OAUTH_CLIENT_SECRET="your-secret"
 
+# Pass them explicitly to mcp-debug via shell expansion
 ./mcp-debug --oauth \
   --oauth-client-id="$OAUTH_CLIENT_ID" \
   --oauth-client-secret="$OAUTH_CLIENT_SECRET" \
   --endpoint https://mcp.example.com/mcp
 ```
+
+### Security Benefits
+
+- Secrets not visible in shell history (when set separately)
+- Secrets not visible in `ps` or `htop` output
+- Easy credential rotation without modifying scripts
 
 ## OAuthConfig Structure
 

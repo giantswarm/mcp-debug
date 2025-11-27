@@ -107,40 +107,11 @@ If you registered a different redirect URI:
 
 **Important:** The redirect URL must match exactly what you registered.
 
-## Configuration File
-
-For complex setups, use a configuration file:
-
-```json
-{
-  "oauth": {
-    "enabled": true,
-    "client_id": "your-client-id-abc123",
-    "client_secret": "your-client-secret-xyz789",
-    "redirect_url": "http://localhost:8765/callback",
-    "scope_mode": "auto"
-  }
-}
-```
-
-**Protect the file:**
-
-```bash
-chmod 600 oauth-config.json
-```
-
-**Use the config:**
-
-```bash
-./mcp-debug --config oauth-config.json --endpoint https://mcp.example.com/mcp
-```
-
 ## Security Best Practices
 
 ### DO
 
 ✅ Store secrets in environment variables
-✅ Use configuration files with restricted permissions (`chmod 600`)
 ✅ Use public clients when possible (PKCE without secret)
 ✅ Rotate client secrets regularly
 ✅ Use different credentials for dev/staging/prod

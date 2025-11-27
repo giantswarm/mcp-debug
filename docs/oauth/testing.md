@@ -451,14 +451,9 @@ When reporting issues to server operators:
 - Per MCP spec and OAuth 2.1, PKCE with S256 method required
 - AS metadata should include: `"code_challenge_methods_supported": ["S256"]`
 
-**Workaround:**
-```bash
-./mcp-debug --oauth --oauth-skip-pkce-validation --endpoint https://example.com/mcp
-```
-
-**Security Impact:**
-- PKCE validation bypass weakens security
-- Allows authorization code interception attacks
+**Impact:**
+- Cannot connect to MCP servers using this authorization server
+- PKCE is mandatory per MCP specification - there is no bypass
 
 **Request:**
 Per MCP Authorization Specification (2025-11-25), PKCE with S256 method is **required**.

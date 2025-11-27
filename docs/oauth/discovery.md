@@ -405,14 +405,21 @@ Use the EU server:
 
 **Problem**: Server doesn't advertise PKCE support
 
+**Error:**
+
+```
+ERROR: Authorization server does not advertise PKCE support with S256 method
+ERROR: Per MCP spec, PKCE is required for security
+```
+
 **Diagnosis**: Check if server actually supports PKCE by reviewing its documentation
 
-**Solution (Testing Only)**:
+**Important**: PKCE is **mandatory** per MCP specification. There is no bypass flag. If the authorization server doesn't support PKCE with S256 method, you cannot connect to MCP servers through it.
 
-```bash
-./mcp-debug --oauth --oauth-skip-pkce-validation \
-  --endpoint https://mcp.example.com/mcp
-```
+**Actions**:
+- Report to server operator that PKCE is required
+- Server must implement RFC 7636 with S256 method
+- Update the server's AS metadata to advertise `code_challenge_methods_supported: ["S256"]`
 
 ### Multiple AS Metadata Endpoints Fail
 
@@ -420,11 +427,11 @@ Use the EU server:
 
 **Diagnosis**: Check the authorization server issuer URL format
 
-**Solution**: Verify the issuer URL and try manual configuration:
+**Solution**: Verify the issuer URL and specify the preferred auth server manually:
 
 ```bash
 ./mcp-debug --oauth \
-  --oauth-skip-auth-server-discovery \
+  --oauth-preferred-auth-server https://auth.example.com \
   --endpoint https://mcp.example.com/mcp
 ```
 

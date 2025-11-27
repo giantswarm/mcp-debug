@@ -330,17 +330,17 @@ export OAUTH_REGISTRATION_TOKEN="your-token"
   --endpoint https://mcp.example.com/mcp
 ```
 
-### Disabling DCR
+### Skipping DCR
 
-For testing or when DCR is not desired:
+To skip Dynamic Client Registration, simply provide pre-registered client credentials:
 
 ```bash
 ./mcp-debug --oauth \
-  --oauth-disable-dcr \
+  --oauth-client-id "your-pre-registered-id" \
   --endpoint https://mcp.example.com/mcp
 ```
 
-**Note**: This flag doesn't exist yet but represents the conceptual approach. Currently, skip DCR by providing `--oauth-client-id`.
+When `--oauth-client-id` is provided, DCR is not attempted.
 
 ## Configuration
 
@@ -350,14 +350,6 @@ For testing or when DCR is not desired:
 |------|-------------|----------|
 | `--oauth-client-id` | OAuth client identifier | Yes |
 | `--oauth-client-secret` | OAuth client secret | No (for public clients) |
-
-### CIMD Flags (Future)
-
-| Flag | Description | Required |
-|------|-------------|----------|
-| `--oauth-client-id-metadata-url` | HTTPS URL to client metadata | Yes (CIMD mode) |
-| `--oauth-generate-client-metadata` | Generate metadata JSON to stdout | No |
-| `--oauth-disable-cimd` | Disable CIMD, use DCR instead | No |
 
 ### DCR Flags
 
@@ -487,19 +479,12 @@ export OAUTH_CLIENT_SECRET="secret123"
 ./mcp-debug --oauth --oauth-registration-token "secret-token" ...
 ```
 
-**Environment Variables** (better):
+**Environment Variables** (recommended):
 
 ```bash
-# Preferred: Token not in process list
+# Recommended: Token not visible in process list
 export OAUTH_REGISTRATION_TOKEN="secret-token"
 ./mcp-debug --oauth --oauth-registration-token "$OAUTH_REGISTRATION_TOKEN" ...
-```
-
-**Configuration Files** (best for production):
-
-```bash
-# Best: Token in protected config file
-./mcp-debug --oauth --config oauth-config.json ...
 ```
 
 ## Troubleshooting
