@@ -178,7 +178,7 @@ func (t *resourceRoundTripper) addResourceParameter(req *http.Request) error {
 		if err != nil {
 			return fmt.Errorf("failed to read request body: %w", err)
 		}
-		req.Body.Close()
+		_ = req.Body.Close()
 
 		// Parse form data
 		values, err := url.ParseQuery(string(bodyBytes))

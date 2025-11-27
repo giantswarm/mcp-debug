@@ -80,9 +80,10 @@ func TestResourceRoundTripperEdgeCases(t *testing.T) {
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Check for resource parameter in query or body
-				if r.Method == http.MethodGet {
+				switch r.Method {
+				case http.MethodGet:
 					receivedResource = r.URL.Query().Get("resource")
-				} else if r.Method == http.MethodPost {
+				case http.MethodPost:
 					bodyBytes, _ := io.ReadAll(r.Body)
 					values, _ := url.ParseQuery(string(bodyBytes))
 					receivedResource = values.Get("resource")
@@ -120,7 +121,7 @@ func TestResourceRoundTripperEdgeCases(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Verify resource parameter was added when expected
 			if tt.expectResource && receivedResource == "" {
@@ -289,7 +290,7 @@ func TestRegistrationTokenRoundTripperEdgeCases(t *testing.T) {
 			if err != nil {
 				t.Fatalf("request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 		})
 	}
 }
@@ -515,7 +516,7 @@ func TestCallbackServerEdgeCases(t *testing.T) {
 
 			// Clean up server
 			if server != nil {
-				server.Close()
+				_ = server.Close()
 			}
 		})
 	}

@@ -171,7 +171,8 @@ func (c *OAuthConfig) Validate() error {
 
 	// Security: Only allow HTTP for localhost/loopback addresses
 	// Note: HTTPS redirect URIs are not supported for the callback server (which only runs on localhost)
-	if parsedURL.Scheme == "http" {
+	switch parsedURL.Scheme {
+	case "http":
 		hostname := parsedURL.Hostname()
 		// Note: Hostname() strips brackets from IPv6 addresses, so [::1] becomes ::1
 		// Accept various forms of localhost: localhost, 127.0.0.1, ::1, and expanded IPv6 0:0:0:0:0:0:0:1
@@ -182,9 +183,9 @@ func (c *OAuthConfig) Validate() error {
 		if !isLocalhost {
 			return fmt.Errorf("HTTP redirect URIs are only allowed for localhost/127.0.0.1/[::1], got: %s", hostname)
 		}
-	} else if parsedURL.Scheme == "https" {
+	case "https":
 		return fmt.Errorf("HTTPS redirect URIs are not supported - callback server only runs on localhost with HTTP (use http://localhost:PORT/callback)")
-	} else {
+	default:
 		return fmt.Errorf("redirect URI scheme must be http, got: %s (only http://localhost:PORT/callback is supported)", parsedURL.Scheme)
 	}
 

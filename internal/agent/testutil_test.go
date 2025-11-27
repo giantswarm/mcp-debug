@@ -63,7 +63,6 @@ type MockAuthServer struct {
 	registrationToken          string
 	scopesSupported            []string
 	codeChallengeMethods       []string
-	requiredScopes             []string
 	issuerURL                  string
 
 	// State tracking
@@ -164,7 +163,7 @@ func (mas *MockAuthServer) handleASMetadata(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(metadata)
+	_ = json.NewEncoder(w).Encode(metadata)
 }
 
 // handleAuthorize handles authorization requests
@@ -303,7 +302,7 @@ func (mas *MockAuthServer) handleToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // handleRegister handles dynamic client registration
@@ -370,7 +369,7 @@ func (mas *MockAuthServer) handleRegister(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // GetRequestCount returns the total number of requests received
@@ -458,7 +457,7 @@ func (mms *MockMCPServer) handleResourceMetadata(w http.ResponseWriter, r *http.
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(metadata)
+	_ = json.NewEncoder(w).Encode(metadata)
 }
 
 // handleRequest handles MCP requests with auth validation
@@ -478,7 +477,7 @@ func (mms *MockMCPServer) handleRequest(w http.ResponseWriter, r *http.Request) 
 				strings.Join(mms.requiredScopes, " "),
 			))
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{
+			_ = json.NewEncoder(w).Encode(map[string]string{
 				"error": "unauthorized",
 			})
 			return
@@ -493,7 +492,7 @@ func (mms *MockMCPServer) handleRequest(w http.ResponseWriter, r *http.Request) 
 		if !valid && !mms.returnInsufficientScope {
 			w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{
+			_ = json.NewEncoder(w).Encode(map[string]string{
 				"error": "invalid_token",
 			})
 			return
@@ -506,7 +505,7 @@ func (mms *MockMCPServer) handleRequest(w http.ResponseWriter, r *http.Request) 
 				strings.Join(append(mms.requiredScopes, "mcp:write"), " "),
 			))
 			w.WriteHeader(http.StatusForbidden)
-			json.NewEncoder(w).Encode(map[string]string{
+			_ = json.NewEncoder(w).Encode(map[string]string{
 				"error":             "insufficient_scope",
 				"error_description": "Additional permissions required",
 			})
@@ -516,7 +515,7 @@ func (mms *MockMCPServer) handleRequest(w http.ResponseWriter, r *http.Request) 
 
 	// Return success response
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"jsonrpc": "2.0",
 		"result":  map[string]string{"status": "ok"},
 		"id":      1,

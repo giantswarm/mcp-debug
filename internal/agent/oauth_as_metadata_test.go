@@ -422,7 +422,7 @@ func TestFetchASMetadata(t *testing.T) {
 						CodeChallengeMethods:  []string{"S256", "plain"},
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(metadata)
+					_ = json.NewEncoder(w).Encode(metadata)
 				}))
 			},
 			wantErr: false,
@@ -448,7 +448,7 @@ func TestFetchASMetadata(t *testing.T) {
 						ScopesSupported:                   []string{"openid", "profile", "email"},
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(metadata)
+					_ = json.NewEncoder(w).Encode(metadata)
 				}))
 			},
 			wantErr: false,
@@ -476,7 +476,7 @@ func TestFetchASMetadata(t *testing.T) {
 			setupServer: func() *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
-					w.Write([]byte("not valid json"))
+					_, _ = w.Write([]byte("not valid json"))
 				}))
 			},
 			wantErr:     true,
@@ -487,7 +487,7 @@ func TestFetchASMetadata(t *testing.T) {
 			setupServer: func() *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "text/plain")
-					w.Write([]byte("plain text"))
+					_, _ = w.Write([]byte("plain text"))
 				}))
 			},
 			wantErr:     true,
@@ -500,7 +500,7 @@ func TestFetchASMetadata(t *testing.T) {
 					w.Header().Set("Content-Type", "application/json")
 					// Write more than maxASMetadataSize bytes
 					largePayload := make([]byte, maxASMetadataSize+1)
-					w.Write(largePayload)
+					_, _ = w.Write(largePayload)
 				}))
 			},
 			wantErr:     true,
@@ -562,7 +562,7 @@ func TestDiscoverAuthorizationServerMetadata(t *testing.T) {
 						CodeChallengeMethods:  []string{"S256"},
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(metadata)
+					_ = json.NewEncoder(w).Encode(metadata)
 				})
 			},
 			wantErr: false,
@@ -587,7 +587,7 @@ func TestDiscoverAuthorizationServerMetadata(t *testing.T) {
 						CodeChallengeMethods:  []string{"S256"},
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(metadata)
+					_ = json.NewEncoder(w).Encode(metadata)
 				})
 			},
 			wantErr: false,
@@ -604,7 +604,7 @@ func TestDiscoverAuthorizationServerMetadata(t *testing.T) {
 						CodeChallengeMethods:  []string{"S256"},
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(metadata)
+					_ = json.NewEncoder(w).Encode(metadata)
 				})
 			},
 			wantErr: false,
@@ -629,7 +629,7 @@ func TestDiscoverAuthorizationServerMetadata(t *testing.T) {
 						CodeChallengeMethods:  []string{"S256"},
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(metadata)
+					_ = json.NewEncoder(w).Encode(metadata)
 				})
 			},
 			wantErr: false,
@@ -652,7 +652,7 @@ func TestDiscoverAuthorizationServerMetadata(t *testing.T) {
 						CodeChallengeMethods:  []string{"S256"},
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(metadata)
+					_ = json.NewEncoder(w).Encode(metadata)
 				})
 			},
 			wantErr: false,

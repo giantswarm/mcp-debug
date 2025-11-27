@@ -424,7 +424,7 @@ func TestFetchProtectedResourceMetadata(t *testing.T) {
 				w.WriteHeader(tt.statusCode)
 
 				if tt.metadata != nil {
-					json.NewEncoder(w).Encode(tt.metadata)
+					_ = json.NewEncoder(w).Encode(tt.metadata)
 				}
 			}))
 			defer server.Close()
@@ -641,7 +641,7 @@ func TestDiscoverProtectedResourceMetadata(t *testing.T) {
 		// Only respond to well-known path
 		if r.URL.Path == wellKnownPath {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(metadata)
+			_ = json.NewEncoder(w).Encode(metadata)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}

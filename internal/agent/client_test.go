@@ -54,7 +54,7 @@ func TestNewClient(t *testing.T) {
 	})
 
 	if client == nil {
-		t.Error("Expected client to be created, but got nil")
+		t.Fatal("Expected client to be created, but got nil")
 	}
 
 	if client.endpoint != "http://localhost:8080" {
@@ -104,7 +104,7 @@ func TestNewClientWithOAuth(t *testing.T) {
 	})
 
 	if client == nil {
-		t.Error("Expected client to be created, but got nil")
+		t.Fatal("Expected client to be created, but got nil")
 	}
 
 	if client.oauthConfig == nil {

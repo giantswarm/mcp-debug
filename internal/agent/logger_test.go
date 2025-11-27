@@ -173,7 +173,7 @@ func TestLoggerConstructors(t *testing.T) {
 	t.Run("NewLogger", func(t *testing.T) {
 		logger := NewLogger(true, true, true)
 		if logger == nil {
-			t.Error("expected NewLogger to return non-nil logger")
+			t.Fatal("expected NewLogger to return non-nil logger")
 		}
 		if !logger.verbose {
 			t.Error("expected verbose to be true")
@@ -190,7 +190,7 @@ func TestLoggerConstructors(t *testing.T) {
 		buf := &bytes.Buffer{}
 		logger := NewLoggerWithWriter(false, false, false, buf)
 		if logger == nil {
-			t.Error("expected NewLoggerWithWriter to return non-nil logger")
+			t.Fatal("expected NewLoggerWithWriter to return non-nil logger")
 		}
 		if logger.writer != buf {
 			t.Error("expected writer to be set to provided buffer")
