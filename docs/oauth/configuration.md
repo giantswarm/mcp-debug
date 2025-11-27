@@ -65,8 +65,6 @@ Complete reference for all OAuth 2.1 configuration options in `mcp-debug`.
 |------|------|-------------|---------|-----------------|
 | `--oauth-skip-resource-param` | boolean | Skip RFC 8707 resource parameter | `false` | **HIGH** |
 | `--oauth-skip-resource-metadata` | boolean | Skip RFC 9728 Protected Resource Metadata discovery | `false` | **MEDIUM** |
-| `--oauth-skip-pkce-validation` | boolean | Skip PKCE support validation | `false` | **CRITICAL** |
-| `--oauth-skip-auth-server-discovery` | boolean | Skip RFC 8414 AS Metadata discovery | `false` | **LOW** |
 
 ## Configuration File
 
@@ -163,9 +161,11 @@ type OAuthConfig struct {
     // Compatibility/Testing
     SkipResourceParam          bool // Skip RFC 8707 (default: false)
     SkipResourceMetadata       bool // Skip RFC 9728 (default: false)
-    SkipPKCEValidation         bool // Skip PKCE check (default: false)
-    SkipAuthServerDiscovery    bool // Skip RFC 8414 (default: false)
 }
+
+// Note: SkipPKCEValidation and SkipAuthServerDiscovery fields exist in
+// the internal struct but are not exposed as CLI flags. PKCE is mandatory
+// per MCP specification and cannot be bypassed.
 ```
 
 ## Default Values
@@ -185,8 +185,6 @@ When fields are not specified, these defaults are used:
 | `StepUpUserPrompt` | `false` | Automatic for better UX |
 | `SkipResourceParam` | `false` | Security feature enabled by default |
 | `SkipResourceMetadata` | `false` | Discovery enabled by default |
-| `SkipPKCEValidation` | `false` | Security check enabled by default |
-| `SkipAuthServerDiscovery` | `false` | Discovery enabled by default |
 
 ## Validation Rules
 
@@ -346,7 +344,6 @@ Error: "invalid scope selection mode: xyz (must be 'auto' or 'manual')"
 ./mcp-debug --oauth \
   --oauth-skip-resource-param \
   --oauth-skip-resource-metadata \
-  --oauth-skip-pkce-validation \
   --endpoint https://legacy-server.com/mcp
 ```
 

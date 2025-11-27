@@ -222,17 +222,7 @@ ERROR: code_challenge_methods_supported: []
 ERROR: Per MCP spec, PKCE is required for security
 ```
 
-### Bypassing PKCE Validation (Testing Only)
-
-For testing servers that support PKCE but don't advertise it:
-
-```bash
-./mcp-debug --oauth \
-  --oauth-skip-pkce-validation \
-  --endpoint https://legacy-server.com/mcp
-```
-
-**DANGER**: This weakens security significantly. PKCE prevents authorization code interception attacks. Only use for testing.
+**Important:** PKCE validation cannot be bypassed. Per MCP specification (2025-11-25), PKCE with S256 method is **mandatory**. Servers that don't support PKCE are not MCP-compliant.
 
 ### AS Metadata Discovery Flow Diagram
 
@@ -259,17 +249,7 @@ sequenceDiagram
     Note over C: Validate PKCE support<br/>Extract endpoints
 ```
 
-### Disabling AS Metadata Discovery
-
-For pre-configured endpoints or testing:
-
-```bash
-./mcp-debug --oauth \
-  --oauth-skip-auth-server-discovery \
-  --endpoint https://legacy-server.com/mcp
-```
-
-**Note**: When disabled, `mcp-debug` relies on the mcp-go library's internal discovery mechanisms.
+**Note**: Authorization server metadata discovery is automatic. If needed, you can manually specify the authorization server using `--oauth-preferred-auth-server`.
 
 ## Discovery Flow
 
@@ -325,8 +305,6 @@ sequenceDiagram
 | Flag | Description | Default | Security Impact |
 |------|-------------|---------|-----------------|
 | `--oauth-skip-resource-metadata` | Disable RFC 9728 discovery | `false` | Medium - manual AS config needed |
-| `--oauth-skip-auth-server-discovery` | Disable RFC 8414 discovery | `false` | Low - fallback to internal mechanisms |
-| `--oauth-skip-pkce-validation` | Skip PKCE support check | `false` | **HIGH** - allows insecure connections |
 | `--oauth-preferred-auth-server` | Select specific AS | (none) | None - overrides priority |
 
 ### When to Use Discovery Flags
@@ -335,16 +313,12 @@ sequenceDiagram
 - Testing older MCP servers (pre-2025 spec)
 - Using pre-configured authorization endpoints
 - Debugging discovery issues
+- Server doesn't implement RFC 9728
 
-**Skip AS Metadata Discovery** (`--oauth-skip-auth-server-discovery`):
-- Testing with custom OAuth setups
-- Using non-standard endpoint locations
-- Debugging endpoint configuration
-
-**Skip PKCE Validation** (`--oauth-skip-pkce-validation`):
-- **ONLY** for testing servers that support PKCE but don't advertise it
-- Never in production
-- Document why you're using it
+**Preferred Authorization Server** (`--oauth-preferred-auth-server`):
+- Multiple authorization servers available
+- Want to use specific AS
+- Override automatic selection
 
 ## Examples
 

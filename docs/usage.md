@@ -279,8 +279,6 @@ If you need to rotate your registration token:
 | `--oauth-skip-resource-param` | Skip RFC 8707 resource parameter (for testing older servers) | `false` |
 | `--oauth-skip-resource-metadata` | Skip RFC 9728 Protected Resource Metadata discovery (for testing) | `false` |
 | `--oauth-preferred-auth-server` | Preferred authorization server URL when multiple are available | |
-| `--oauth-skip-pkce-validation` | Skip PKCE support validation in AS metadata (DANGEROUS - testing only) | `false` |
-| `--oauth-skip-auth-server-discovery` | Skip RFC 8414 AS Metadata discovery (for testing) | `false` |
 
 ### RFC 8707 Resource Indicators
 
@@ -421,11 +419,8 @@ If you need to test with an older authorization server that supports PKCE but do
 
 ```bash
 ./mcp-debug --oauth \
-  --oauth-skip-pkce-validation \
   --endpoint https://legacy-auth-server.com/mcp
 ```
-
-**Warning:** The `--oauth-skip-pkce-validation` flag weakens security and should only be used for testing. PKCE is a critical security feature that prevents authorization code interception attacks.
 
 **Disabling AS Metadata Discovery:**
 
@@ -433,7 +428,6 @@ For testing with older servers or pre-configured endpoints:
 
 ```bash
 ./mcp-debug --oauth \
-  --oauth-skip-auth-server-discovery \
   --endpoint https://legacy-server.com/mcp
 ```
 

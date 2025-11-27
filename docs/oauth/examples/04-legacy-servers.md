@@ -81,7 +81,6 @@ ERROR: code_challenge_methods_supported: []
 
 ```bash
 ./mcp-debug --oauth \
-  --oauth-skip-pkce-validation \
   --endpoint https://legacy-server.com/mcp
 ```
 
@@ -106,7 +105,6 @@ If PKCE works, report to server operator to update metadata.
 ./mcp-debug --oauth \
   --oauth-skip-resource-param \
   --oauth-skip-resource-metadata \
-  --oauth-skip-pkce-validation \
   --oauth-client-id "pre-registered-client" \
   --oauth-client-secret "$CLIENT_SECRET" \
   --endpoint https://very-legacy-server.com/mcp
@@ -153,7 +151,6 @@ Add compatibility flags one at a time:
 ./mcp-debug --oauth --verbose \
   --oauth-skip-resource-param \
   --oauth-skip-resource-metadata \
-  --oauth-skip-pkce-validation \
   --endpoint https://server.example.com/mcp
 ```
 
@@ -183,7 +180,6 @@ Create a compatibility report:
 \`\`\`bash
 --oauth-skip-resource-param
 --oauth-skip-resource-metadata
---oauth-skip-pkce-validation
 \`\`\`
 
 ### Recommendations
@@ -305,8 +301,6 @@ If the server fails even with all compatibility flags:
 ./mcp-debug --oauth --verbose \
   --oauth-skip-resource-param \
   --oauth-skip-resource-metadata \
-  --oauth-skip-pkce-validation \
-  --oauth-skip-auth-server-discovery \
   --oauth-client-id "$CLIENT_ID" \
   --oauth-client-secret "$CLIENT_SECRET" \
   --endpoint https://server.com/mcp

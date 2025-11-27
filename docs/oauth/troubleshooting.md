@@ -149,7 +149,6 @@ ERROR: All well-known URIs returned 404
 
 ```bash
 ./mcp-debug --oauth \
-  --oauth-skip-auth-server-discovery \
   --endpoint https://mcp.example.com/mcp
 ```
 
@@ -507,7 +506,6 @@ Report to server operator.
 
 ```bash
 ./mcp-debug --oauth \
-  --oauth-skip-pkce-validation \
   --endpoint https://mcp.example.com/mcp
 ```
 

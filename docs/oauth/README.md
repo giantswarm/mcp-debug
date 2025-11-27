@@ -126,7 +126,6 @@ Disable modern features for compatibility:
 ```bash
 ./mcp-debug --oauth \
   --oauth-skip-resource-param \
-  --oauth-skip-pkce-validation \
   --endpoint https://legacy-server.com/mcp
 ```
 

@@ -25,7 +25,6 @@ The MCP authorization specification (2025-11-25) requires modern OAuth 2.1 featu
 # Testing: Compatibility flags for legacy server
 ./mcp-debug --oauth \
   --oauth-skip-resource-param \
-  --oauth-skip-pkce-validation \
   --endpoint https://legacy-server.com/mcp
 ```
 
@@ -37,8 +36,6 @@ The MCP authorization specification (2025-11-25) requires modern OAuth 2.1 featu
 |------|------------------|-----------------|----------|
 | `--oauth-skip-resource-param` | RFC 8707 Resource Indicators | **HIGH** - No token audience binding | Test pre-RFC 8707 servers |
 | `--oauth-skip-resource-metadata` | RFC 9728 Protected Resource Metadata | **MEDIUM** - Manual AS config needed | Test pre-RFC 9728 servers |
-| `--oauth-skip-pkce-validation` | PKCE support validation | **CRITICAL** - May allow insecure connections | Test servers with PKCE but no advertisement |
-| `--oauth-skip-auth-server-discovery` | RFC 8414 AS Metadata discovery | **LOW** - Falls back to internal mechanisms | Test non-standard endpoints |
 | `--oauth-disable-step-up` | Step-up authorization | **LOW** - Manual scope management needed | Test scope handling |
 
 ### --oauth-skip-resource-param
@@ -102,64 +99,6 @@ The MCP authorization specification (2025-11-25) requires modern OAuth 2.1 featu
 
 **Note:** You may need to manually specify authorization server URL.
 
-### --oauth-skip-pkce-validation
-
-**What it does:** Skips checking for PKCE support in AS metadata
-
-**Security impact:** **CRITICAL**
-
-- May connect to servers without PKCE
-- Authorization code interception attacks possible
-- Man-in-the-middle vulnerabilities
-- **Violates MCP specification**
-
-**When to use:**
-
-- Server supports PKCE but doesn't advertise it
-- Testing legacy servers during migration
-- **NEVER** in production
-
-**Example:**
-
-```bash
-./mcp-debug --oauth \
-  --oauth-skip-pkce-validation \
-  --endpoint https://legacy-auth.example.com/mcp
-```
-
-**Warnings logged:**
-
-```
-[WARNING] PKCE validation disabled - DANGEROUS
-[WARNING] Connecting to servers without PKCE support is insecure
-[WARNING] Authorization code interception attacks are possible
-[WARNING] Use only for testing legacy servers
-```
-
-### --oauth-skip-auth-server-discovery
-
-**What it does:** Disables RFC 8414 AS Metadata discovery
-
-**Security impact:** **LOW**
-
-- Falls back to mcp-go internal discovery
-- May not detect all AS capabilities
-- Endpoint configuration may be incomplete
-
-**When to use:**
-
-- Non-standard AS metadata locations
-- Testing custom authorization server setups
-- Debugging endpoint configuration issues
-
-**Example:**
-
-```bash
-./mcp-debug --oauth \
-  --oauth-skip-auth-server-discovery \
-  --endpoint https://custom-server.com/mcp
-```
-
 ### --oauth-disable-step-up
 
 **What it does:** Disables automatic step-up authorization
@@ -205,10 +144,9 @@ ERROR: Please re-run with additional scopes
 |-------|---------------|----------------|
 | None | ✅ **Secure** | Production use |
 | `--oauth-skip-resource-metadata` | ⚠️ **Low** | Acceptable for legacy testing |
-| `--oauth-skip-auth-server-discovery` | ⚠️ **Low** | Acceptable for custom setups |
 | `--oauth-skip-resource-param` | ❌ **High** | Test only, document reason |
-| `--oauth-skip-pkce-validation` | 🔴 **Critical** | **Never** in production |
-| Multiple flags | 🔴 **Critical** | Extreme caution required |
+| `--oauth-disable-step-up` | ⚠️ **Low** | Acceptable for testing |
+| Multiple flags | ❌ **High** | Caution required |
 
 ### Cumulative Risk
 
@@ -218,7 +156,6 @@ Using multiple compatibility flags compounds security risks:
 # DANGEROUS: Multiple security features disabled
 ./mcp-debug --oauth \
   --oauth-skip-resource-param \
-  --oauth-skip-pkce-validation \
   --oauth-skip-resource-metadata \
   --endpoint https://very-legacy-server.com/mcp
 ```
@@ -226,7 +163,6 @@ Using multiple compatibility flags compounds security risks:
 **Disabled protections:**
 
 - ❌ Token audience binding
-- ❌ PKCE enforcement
 - ❌ Automatic discovery
 
 **Result:** Minimal OAuth security, suitable only for isolated testing.
@@ -251,11 +187,11 @@ Using multiple compatibility flags compounds security risks:
      --endpoint https://legacy-mcp.example.com/mcp
    ```
 
-3. If automatic AS discovery fails:
+3. If you need to manually specify the authorization server:
    ```bash
    ./mcp-debug --oauth \
      --oauth-skip-resource-metadata \
-     --oauth-skip-auth-server-discovery \
+     --oauth-preferred-auth-server https://auth.example.com \
      --endpoint https://legacy-mcp.example.com/mcp
    ```
 
@@ -303,27 +239,16 @@ curl https://test-server.com/mcp/.well-known/oauth-protected-resource
 
 **Goal:** Test migration from legacy OAuth to MCP-compliant OAuth
 
-**Phase 1: Baseline (all features disabled)**
+**Phase 1: Baseline (minimal features)**
 
 ```bash
-./mcp-debug --oauth \
-  --oauth-skip-resource-param \
-  --oauth-skip-resource-metadata \
-  --oauth-skip-pkce-validation \
-  --endpoint https://server.example.com/mcp
-```
-
-**Phase 2: Enable PKCE**
-
-```bash
-# Remove --oauth-skip-pkce-validation
 ./mcp-debug --oauth \
   --oauth-skip-resource-param \
   --oauth-skip-resource-metadata \
   --endpoint https://server.example.com/mcp
 ```
 
-**Phase 3: Enable Resource Indicators**
+**Phase 2: Enable Resource Indicators**
 
 ```bash
 # Remove --oauth-skip-resource-param
@@ -332,14 +257,14 @@ curl https://test-server.com/mcp/.well-known/oauth-protected-resource
   --endpoint https://server.example.com/mcp
 ```
 
-**Phase 4: Enable Protected Resource Metadata**
+**Phase 3: Enable Protected Resource Metadata**
 
 ```bash
 # Remove all compatibility flags
 ./mcp-debug --oauth --endpoint https://server.example.com/mcp
 ```
 
-**Phase 5: Full Compliance**
+**Phase 4: Full Compliance**
 
 Verify all features work without compatibility flags.
 
@@ -379,15 +304,17 @@ ERROR: All well-known URIs returned 404
 
 **Solution:**
 
+Manually specify the authorization server:
+
 ```bash
 ./mcp-debug --oauth \
-  --oauth-skip-auth-server-discovery \
+  --oauth-preferred-auth-server https://auth.example.com \
   --endpoint https://server.example.com/mcp
 ```
 
 **Alternative:** Manually check AS metadata location and report to server operator.
 
-### Scenario 3: PKCE Validation Fails
+### Scenario 3: PKCE Support Not Advertised
 
 **Problem:**
 
@@ -396,19 +323,17 @@ ERROR: Authorization server does not advertise PKCE support
 ERROR: code_challenge_methods_supported: []
 ```
 
-**Diagnosis:** Server may support PKCE but doesn't advertise it
+**Diagnosis:** Server doesn't support PKCE or doesn't advertise it properly
 
-**Verify:** Check if server actually supports PKCE
+**Solution:**
 
-```bash
-# Try with PKCE anyway (skip validation)
-./mcp-debug --oauth \
-  --oauth-skip-pkce-validation \
-  --verbose \
-  --endpoint https://server.example.com/mcp
-```
+This is a **critical security issue**. The server must support PKCE per MCP specification.
 
-**Check logs:** If PKCE succeeds, server needs to update metadata.
+1. **Report to server operator** - PKCE is required
+2. **Check AS metadata** - Verify `code_challenge_methods_supported`  
+3. **Do not proceed** - PKCE is mandatory for security
+
+The MCP specification requires PKCE support. There is no bypass available.
 
 ### Scenario 4: Resource Metadata 404
 
@@ -446,7 +371,7 @@ Note which features fail.
 
 Priority order:
 
-1. **PKCE** (Critical)
+1. **PKCE** (Critical - **Required** by MCP spec)
 2. **Protected Resource Metadata** (RFC 9728)
 3. **Resource Indicators** (RFC 8707)
 4. **AS Metadata Discovery** (RFC 8414)
@@ -536,8 +461,11 @@ When reporting issues to server operators:
 - Allows authorization code interception attacks
 
 **Request:**
-Please update authorization server metadata to advertise PKCE support.
+Per MCP Authorization Specification (2025-11-25), PKCE with S256 method is **required**.
+Please update authorization server to support and advertise PKCE.
 ```
+
+**Note:** There is no bypass flag for PKCE - it is mandatory for MCP compliance.
 
 ## See Also
 

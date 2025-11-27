@@ -142,21 +142,22 @@ ERROR: Per MCP specification, PKCE is required for security
 ERROR: Refusing to proceed with insecure authorization server
 ```
 
-### Bypass PKCE Validation (DANGEROUS)
+### PKCE is Mandatory
 
-**NEVER** use in production:
+Per MCP Authorization Specification (2025-11-25), **PKCE is required and cannot be bypassed**.
 
-```bash
-./mcp-debug --oauth \
-  --oauth-skip-pkce-validation \
-  --endpoint https://legacy-server.com/mcp
+If a server doesn't support PKCE:
+
+```
+ERROR: Authorization server does not advertise PKCE support
+ERROR: This is required by MCP spec
 ```
 
-**Risks:**
-- Authorization code interception
-- Token theft via man-in-the-middle
-- Replay attacks
-- Violates MCP security requirements
+**Actions:**
+- Report to server operator that PKCE is mandatory
+- Server must implement RFC 7636 with S256 method
+- Do not proceed - PKCE is critical for security
+- There is no bypass flag
 
 ## Resource Indicators
 
@@ -439,13 +440,13 @@ Security model assumes:
 ### For Users
 
 1. **Use Pre-Registered Clients**: More control than DCR
-2. **Enable All Security Features**: Don't skip PKCE validation
-3. **Review Authorization Prompts**: Check requested scopes
-4. **Protect Credentials**: Use environment variables
-5. **Monitor Access**: Review authorization server logs
-6. **Keep Updated**: Update `mcp-debug` for security patches
-7. **Use HTTPS**: Always use HTTPS endpoints (except localhost)
-8. **Limit Scopes**: Request minimal scopes needed
+2. **Review Authorization Prompts**: Check requested scopes carefully
+3. **Protect Credentials**: Use environment variables, not CLI flags
+4. **Monitor Access**: Review authorization server logs regularly
+5. **Keep Updated**: Update `mcp-debug` for security patches
+6. **Use HTTPS**: Always use HTTPS endpoints (except localhost callback)
+7. **Limit Scopes**: Request minimal scopes needed
+8. **Verify Server Compliance**: Ensure servers support PKCE
 
 ### For MCP Server Operators
 
