@@ -61,7 +61,7 @@ WWW-Authenticate: Bearer resource_metadata="https://mcp.example.com/.well-known/
 If no `resource_metadata` parameter is provided, `mcp-debug` tries well-known URIs in priority order:
 
 ```
-1. https://mcp.example.com/mcp/.well-known/oauth-protected-resource  (path-specific)
+1. https://mcp.example.com/.well-known/oauth-protected-resource/mcp  (path-specific)
 2. https://mcp.example.com/.well-known/oauth-protected-resource      (root)
 ```
 

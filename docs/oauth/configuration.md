@@ -325,7 +325,6 @@ Error: "invalid scope selection mode: xyz (must be 'auto' or 'manual')"
 
 - No resource parameter
 - No RFC 9728 discovery
-- No PKCE validation
 - **Significantly reduced security**
 
 ### OIDC Mode

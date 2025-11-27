@@ -171,7 +171,7 @@ RFC 8707 requires resource URIs to be in canonical form for consistent matching.
 4. **Preserve path**: `/api/v1/mcp` → `/api/v1/mcp` (exact case)
 5. **Remove trailing slash**: `https://example.com/mcp/` → `https://example.com/mcp`
 6. **Remove fragment**: `https://example.com/mcp#section` → `https://example.com/mcp`
-7. **Keep query parameters**: `https://example.com/mcp?v=1` → `https://example.com/mcp?v=1`
+7. **Remove query parameters**: `https://example.com/mcp?v=1` → `https://example.com/mcp`
 
 ### Canonicalization Examples
 
