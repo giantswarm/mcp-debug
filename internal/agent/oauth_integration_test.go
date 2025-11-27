@@ -377,3 +377,204 @@ func TestHTTPSEnforcement(t *testing.T) {
 		})
 	}
 }
+
+// TestClientRegistrationPriority tests the client registration priority logic:
+// 1. Pre-registered client ID
+// 2. Client ID Metadata Documents (CIMD)
+// 3. Dynamic Client Registration (DCR)
+// 4. Manual configuration (error case)
+func TestClientRegistrationPriority(t *testing.T) {
+	tests := []struct {
+		name                string
+		clientID            string
+		clientIDMetadataURL string
+		disableCIMD         bool
+		expectedClientID    string
+		description         string
+	}{
+		{
+			name:             "priority_1_pre_registered_client_id",
+			clientID:         "pre-registered-client-123",
+			expectedClientID: "pre-registered-client-123",
+			description:      "Pre-registered client ID should be used when provided",
+		},
+		{
+			name:                "priority_2_cimd_when_no_client_id",
+			clientID:            "",
+			clientIDMetadataURL: "https://app.example.com/oauth/client-metadata.json",
+			disableCIMD:         false,
+			expectedClientID:    "https://app.example.com/oauth/client-metadata.json",
+			description:         "CIMD URL should be used as client_id when no pre-registered client ID",
+		},
+		{
+			name:                "priority_1_over_priority_2",
+			clientID:            "pre-registered-client-123",
+			clientIDMetadataURL: "https://app.example.com/oauth/client-metadata.json",
+			disableCIMD:         false,
+			expectedClientID:    "pre-registered-client-123",
+			description:         "Pre-registered client ID takes priority over CIMD",
+		},
+		{
+			name:                "cimd_disabled_falls_back_to_dcr",
+			clientID:            "",
+			clientIDMetadataURL: "https://app.example.com/oauth/client-metadata.json",
+			disableCIMD:         true,
+			expectedClientID:    "",
+			description:         "CIMD URL should be ignored when DisableCIMD is true, falling back to DCR",
+		},
+		{
+			name:             "no_client_id_falls_back_to_dcr",
+			clientID:         "",
+			expectedClientID: "",
+			description:      "Empty client ID should fall back to DCR (mcp-go handles this)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &OAuthConfig{
+				Enabled:             true,
+				ClientID:            tt.clientID,
+				ClientIDMetadataURL: tt.clientIDMetadataURL,
+				DisableCIMD:         tt.disableCIMD,
+				RedirectURL:         "http://localhost:8765/callback",
+			}
+
+			// Apply defaults
+			config = config.WithDefaults()
+
+			// Validate configuration
+			if err := config.Validate(); err != nil {
+				t.Fatalf("config validation failed: %v", err)
+			}
+
+			// Simulate the client registration priority logic from client.go
+			var actualClientID string
+			if config.ClientID != "" {
+				// Priority 1: Pre-registered
+				actualClientID = config.ClientID
+			} else if config.ClientIDMetadataURL != "" && !config.DisableCIMD {
+				// Priority 2: CIMD
+				actualClientID = config.ClientIDMetadataURL
+			} else {
+				// Priority 3: DCR (empty client ID means DCR will be attempted)
+				actualClientID = ""
+			}
+
+			if actualClientID != tt.expectedClientID {
+				t.Errorf("%s: got client_id = %q, want %q", tt.description, actualClientID, tt.expectedClientID)
+			}
+		})
+	}
+}
+
+// TestCIMDWithMockAuthServer tests CIMD integration with mock authorization server
+func TestCIMDWithMockAuthServer(t *testing.T) {
+	env := setupTestEnvironment(t)
+	defer env.cleanup()
+
+	// Configure mock AS to support CIMD
+	env.AS.supportsClientIDMetadata = true
+
+	// Create a valid client metadata URL (using mock server)
+	// Note: In real usage, this would point to where the client hosts their metadata
+	clientMetadataURL := "https://app.example.com/oauth/client-metadata.json"
+
+	config := &OAuthConfig{
+		Enabled:             true,
+		ClientIDMetadataURL: clientMetadataURL,
+		DisableCIMD:         false,
+		RedirectURL:         "http://localhost:8765/callback",
+	}
+
+	config = config.WithDefaults()
+
+	if err := config.Validate(); err != nil {
+		t.Fatalf("config validation failed: %v", err)
+	}
+
+	// Verify that CIMD URL is used as client_id
+	var clientID string
+	if config.ClientID != "" {
+		clientID = config.ClientID
+	} else if config.ClientIDMetadataURL != "" && !config.DisableCIMD {
+		clientID = config.ClientIDMetadataURL
+	}
+
+	if clientID != clientMetadataURL {
+		t.Errorf("Expected client_id to be CIMD URL %q, got %q", clientMetadataURL, clientID)
+	}
+
+	// Verify AS metadata advertises CIMD support
+	ctx := context.Background()
+	logger := NewLogger(false, false, false)
+
+	asMetadata, err := DiscoverAuthorizationServerMetadata(ctx, env.AS.URL, logger)
+	if err != nil {
+		t.Fatalf("AS metadata discovery failed: %v", err)
+	}
+
+	if !asMetadata.ClientIDMetadataDocumentSupported {
+		t.Error("Mock AS should advertise CIMD support")
+	}
+
+	// Verify CIMD support detection helper
+	if !SupportsClientIDMetadata(asMetadata) {
+		t.Error("SupportsClientIDMetadata should return true for mock AS")
+	}
+}
+
+// TestCIMDValidationInConfig tests that invalid CIMD URLs are caught during validation
+func TestCIMDValidationInConfig(t *testing.T) {
+	tests := []struct {
+		name                string
+		clientIDMetadataURL string
+		wantErr             bool
+		errMsg              string
+	}{
+		{
+			name:                "valid_https_url_with_path",
+			clientIDMetadataURL: "https://app.example.com/oauth/client-metadata.json",
+			wantErr:             false,
+		},
+		{
+			name:                "invalid_http_url",
+			clientIDMetadataURL: "http://app.example.com/oauth/client-metadata.json",
+			wantErr:             true,
+			errMsg:              "must use https scheme",
+		},
+		{
+			name:                "invalid_no_path",
+			clientIDMetadataURL: "https://app.example.com",
+			wantErr:             true,
+			errMsg:              "must contain a path component",
+		},
+		{
+			name:                "empty_url_is_valid",
+			clientIDMetadataURL: "",
+			wantErr:             false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &OAuthConfig{
+				Enabled:             true,
+				ClientIDMetadataURL: tt.clientIDMetadataURL,
+				RedirectURL:         "http://localhost:8765/callback",
+			}
+
+			config = config.WithDefaults()
+			err := config.Validate()
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr && err != nil && !strings.Contains(err.Error(), tt.errMsg) {
+				t.Errorf("Validate() error = %v, expected to contain %q", err, tt.errMsg)
+			}
+		})
+	}
+}

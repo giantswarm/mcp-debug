@@ -161,9 +161,27 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 			}
 		}
 
+		// Determine client ID using registration priority per MCP spec
+		// Priority 1: Pre-registered client ID (explicit configuration)
+		// Priority 2: Client ID Metadata Documents (CIMD)
+		// Priority 3: Dynamic Client Registration (handled by mcp-go if ClientID is empty)
+		// Priority 4: Manual configuration (handled by mcp-go error flow)
+		clientID := c.oauthConfig.ClientID
+
+		if clientID == "" && c.oauthConfig.ClientIDMetadataURL != "" && !c.oauthConfig.DisableCIMD {
+			// Use Client ID Metadata Documents (CIMD)
+			// The Authorization Server will fetch client metadata from this HTTPS URL
+			clientID = c.oauthConfig.ClientIDMetadataURL
+			c.logger.Info("Using Client ID Metadata Documents (CIMD): %s", clientID)
+		} else if clientID != "" {
+			c.logger.Info("Using pre-registered client ID: %s", clientID)
+		} else {
+			c.logger.Info("No client ID configured - will attempt Dynamic Client Registration")
+		}
+
 		// Create mcp-go OAuth config
 		mcpOAuthConfig := client.OAuthConfig{
-			ClientID:     c.oauthConfig.ClientID,
+			ClientID:     clientID,
 			ClientSecret: c.oauthConfig.ClientSecret,
 			RedirectURI:  c.oauthConfig.RedirectURL,
 			Scopes:       selectedScopes,
