@@ -5,7 +5,7 @@ go 1.24.6
 require (
 	github.com/chzyer/readline v1.5.1
 	github.com/creativeprojects/go-selfupdate v1.5.1
-	github.com/mark3labs/mcp-go v0.43.1
+	github.com/mark3labs/mcp-go v0.43.2
 	github.com/spf13/cobra v1.10.1
 )
 
