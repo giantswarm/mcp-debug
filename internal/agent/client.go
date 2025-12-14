@@ -28,6 +28,7 @@ type Client struct {
 	serverCapabilities *mcp.ServerCapabilities
 	oauthConfig        *OAuthConfig
 	version            string
+	resourceURI        string // RFC 8707 resource URI for OAuth flows
 }
 
 // ClientConfig holds configuration for creating a new Client
@@ -138,6 +139,9 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 		if c.oauthConfig.SkipResourceParam {
 			c.logger.Warning("RFC 8707 resource parameter disabled - this weakens token security")
 		}
+
+		// Store resourceURI for use in OAuth authorization flow
+		c.resourceURI = resourceURI
 
 		// Select scopes using MCP spec priority order
 		// Note: WWW-Authenticate challenge is not available during proactive connection
