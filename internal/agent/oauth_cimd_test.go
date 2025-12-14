@@ -490,6 +490,113 @@ func TestSupportsClientIDMetadata(t *testing.T) {
 	}
 }
 
+// TestValidateCIMDConsistency tests the CIMD consistency validation
+func TestValidateCIMDConsistency(t *testing.T) {
+	tests := []struct {
+		name      string
+		setupMock func(serverURL string) *httptest.Server
+		wantErr   bool
+		errMsg    string
+	}{
+		{
+			name: "consistent client_id - matches URL",
+			setupMock: func(serverURL string) *httptest.Server {
+				return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					// The client_id in the document will match the URL (set in test)
+					json.NewEncoder(w).Encode(&ClientMetadataDocument{
+						ClientID:     serverURL + "/client.json",
+						ClientName:   "Test Client",
+						RedirectURIs: []string{"http://localhost:8765/callback"},
+					})
+				}))
+			},
+			wantErr: false,
+		},
+		{
+			name: "inconsistent client_id - does not match URL",
+			setupMock: func(_ string) *httptest.Server {
+				return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					// client_id does NOT match the URL
+					json.NewEncoder(w).Encode(&ClientMetadataDocument{
+						ClientID:     "https://other-domain.com/client.json",
+						ClientName:   "Test Client",
+						RedirectURIs: []string{"http://localhost:8765/callback"},
+					})
+				}))
+			},
+			wantErr: true,
+			errMsg:  "CIMD consistency check failed",
+		},
+		{
+			name: "fetch error - 404",
+			setupMock: func(_ string) *httptest.Server {
+				return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusNotFound)
+				}))
+			},
+			wantErr: true,
+			errMsg:  "failed to fetch CIMD",
+		},
+		{
+			name: "fetch error - invalid JSON",
+			setupMock: func(_ string) *httptest.Server {
+				return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					w.Write([]byte("not valid json"))
+				}))
+			},
+			wantErr: true,
+			errMsg:  "failed to fetch CIMD",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock server
+			var server *httptest.Server
+
+			// For the consistent test, we need to dynamically return the client_id
+			// matching the actual server URL
+			if tt.name == "consistent client_id - matches URL" {
+				// Use a pointer to store the server URL
+				var serverURL string
+				server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					// Build the expected client_id from the request
+					clientID := "https://" + r.Host + "/client.json"
+					json.NewEncoder(w).Encode(&ClientMetadataDocument{
+						ClientID:     clientID,
+						ClientName:   "Test Client",
+						RedirectURIs: []string{"http://localhost:8765/callback"},
+					})
+				}))
+				serverURL = server.URL
+				_ = serverURL // Suppress unused warning
+			} else {
+				server = tt.setupMock("")
+			}
+			defer server.Close()
+
+			cimdURL := server.URL + "/client.json"
+			ctx := context.Background()
+
+			err := validateCIMDConsistencyWithClient(ctx, cimdURL, server.Client())
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateCIMDConsistency() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && err != nil && tt.errMsg != "" {
+				if !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("ValidateCIMDConsistency() error = %v, expected to contain %q", err, tt.errMsg)
+				}
+			}
+		})
+	}
+}
+
 // TestOAuthConfigValidation_CIMD tests CIMD-related config validation
 func TestOAuthConfigValidation_CIMD(t *testing.T) {
 	tests := []struct {

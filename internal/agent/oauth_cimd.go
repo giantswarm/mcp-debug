@@ -271,3 +271,33 @@ func ValidateClientMetadata(metadata *ClientMetadataDocument) error {
 func SupportsClientIDMetadata(asMetadata *AuthorizationServerMetadata) bool {
 	return asMetadata != nil && asMetadata.ClientIDMetadataDocumentSupported
 }
+
+// ValidateCIMDConsistency fetches a Client ID Metadata Document and validates
+// that the client_id field in the document matches the URL it was fetched from.
+//
+// This is a security check to catch configuration errors early, especially when
+// users provide custom CIMD URLs. The CIMD spec requires that the client_id in
+// the document matches the URL where it is hosted.
+//
+// Returns nil if validation passes, or an error describing the mismatch.
+func ValidateCIMDConsistency(ctx context.Context, cimdURL string) error {
+	return validateCIMDConsistencyWithClient(ctx, cimdURL, nil)
+}
+
+// validateCIMDConsistencyWithClient allows injecting a custom HTTP client for testing
+func validateCIMDConsistencyWithClient(ctx context.Context, cimdURL string, httpClient *http.Client) error {
+	// Fetch the metadata document
+	metadata, err := fetchClientMetadataWithClient(ctx, cimdURL, httpClient)
+	if err != nil {
+		return fmt.Errorf("failed to fetch CIMD from %s: %w", cimdURL, err)
+	}
+
+	// Verify client_id matches the URL
+	// Per CIMD spec, the client_id in the document MUST match the URL where it's hosted
+	if metadata.ClientID != cimdURL {
+		return fmt.Errorf("CIMD consistency check failed: client_id in document (%s) does not match URL (%s)",
+			metadata.ClientID, cimdURL)
+	}
+
+	return nil
+}
