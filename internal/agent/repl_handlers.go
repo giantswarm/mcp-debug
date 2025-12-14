@@ -40,11 +40,21 @@ func parseToolArgs(argsStr string, toolName string) (map[string]interface{}, err
 func displayToolResultContent(content mcp.Content) {
 	if textContent, ok := mcp.AsTextContent(content); ok {
 		displayTextContent(textContent.Text)
-	} else if imageContent, ok := mcp.AsImageContent(content); ok {
-		fmt.Printf("[Image: MIME type %s, %d bytes]\n", imageContent.MIMEType, len(imageContent.Data))
-	} else if audioContent, ok := mcp.AsAudioContent(content); ok {
-		fmt.Printf("[Audio: MIME type %s, %d bytes]\n", audioContent.MIMEType, len(audioContent.Data))
+		return
 	}
+	if imageContent, ok := mcp.AsImageContent(content); ok {
+		fmt.Printf("[Image: MIME type %s, %d bytes]\n", imageContent.MIMEType, len(imageContent.Data))
+		return
+	}
+	if audioContent, ok := mcp.AsAudioContent(content); ok {
+		fmt.Printf("[Audio: MIME type %s, %d bytes]\n", audioContent.MIMEType, len(audioContent.Data))
+		return
+	}
+	if resource, ok := mcp.AsEmbeddedResource(content); ok {
+		fmt.Printf("[Embedded Resource: %v]\n", resource.Resource)
+		return
+	}
+	fmt.Printf("%+v\n", content)
 }
 
 // displayTextContent displays text content, pretty-printing JSON if possible
@@ -100,24 +110,26 @@ func (r *REPL) handleCallTool(ctx context.Context, toolName string, argsStr stri
 	return nil
 }
 
+// findResource finds a resource by URI in the cache
+func (r *REPL) findResource(uri string) *mcp.Resource {
+	r.client.mu.RLock()
+	defer r.client.mu.RUnlock()
+
+	for _, res := range r.client.resourceCache {
+		if res.URI == uri {
+			return &res
+		}
+	}
+	return nil
+}
+
 // handleGetResource retrieves and displays a resource
 func (r *REPL) handleGetResource(ctx context.Context, uri string) error {
-	// Check if server supports resources
 	if !r.client.ServerSupportsResources() {
 		return fmt.Errorf("server does not support resources capability")
 	}
 
-	// Find the resource to validate it exists
-	r.client.mu.RLock()
-	var resource *mcp.Resource
-	for _, res := range r.client.resourceCache {
-		if res.URI == uri {
-			resource = &res
-			break
-		}
-	}
-	r.client.mu.RUnlock()
-
+	resource := r.findResource(uri)
 	if resource == nil {
 		return fmt.Errorf("resource not found: %s", uri)
 	}

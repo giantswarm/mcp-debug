@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"mcp-debug/internal/agent"
 	"os"
@@ -11,6 +12,11 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+)
+
+const (
+	// transportStreamableHTTP is the only supported transport protocol
+	transportStreamableHTTP = "streamable-http"
 )
 
 var (
@@ -104,7 +110,7 @@ func SetVersion(v string) {
 func init() {
 	// Add flags
 	rootCmd.Flags().StringVar(&endpoint, "endpoint", "http://localhost:8090/mcp", "MCP endpoint URL (must end with /mcp)")
-	rootCmd.Flags().StringVar(&transport, "transport", "streamable-http", "Transport protocol to use for client connections (streamable-http only)")
+	rootCmd.Flags().StringVar(&transport, "transport", transportStreamableHTTP, "Transport protocol to use for client connections (streamable-http only)")
 	rootCmd.Flags().StringVar(&serverTransport, "server-transport", "stdio", "Transport protocol for the MCP server itself (stdio, streamable-http)")
 	rootCmd.Flags().StringVar(&listenAddr, "listen-addr", ":8899", "Listen address for streamable-http server (path is fixed to /mcp)")
 	rootCmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Timeout for waiting for notifications")
@@ -144,10 +150,10 @@ func init() {
 
 // validateTransport validates the transport configuration
 func validateTransport() error {
-	if transport == "streamable-http" && !strings.HasSuffix(endpoint, "/mcp") {
+	if transport == transportStreamableHTTP && !strings.HasSuffix(endpoint, "/mcp") {
 		return fmt.Errorf("endpoint '%s' must end with /mcp for streamable-http transport", endpoint)
 	}
-	if transport != "streamable-http" {
+	if transport != transportStreamableHTTP {
 		return fmt.Errorf("unsupported transport '%s' (only streamable-http is supported)", transport)
 	}
 	return nil
@@ -223,7 +229,7 @@ func runMCPServer(ctx context.Context, client *agent.Client, logger *agent.Logge
 	}
 
 	logger.Info("Starting mcp-debug MCP server (transport: %s)...", serverTransport)
-	if serverTransport == "streamable-http" {
+	if serverTransport == transportStreamableHTTP {
 		addr := listenAddr
 		if !strings.Contains(addr, ":") {
 			addr = ":" + addr
@@ -243,7 +249,7 @@ func runNormalMode(ctx context.Context, client *agent.Client, logger *agent.Logg
 	defer timeoutCancel()
 
 	if err := client.Listen(timeoutCtx); err != nil {
-		if err == context.DeadlineExceeded {
+		if errors.Is(err, context.DeadlineExceeded) {
 			logger.Info("Timeout reached after %v", timeout)
 			return nil
 		}

@@ -13,22 +13,28 @@ import (
 	"github.com/chzyer/readline"
 )
 
+// errExit is a sentinel error used to signal REPL exit
+var errExit = errors.New("exit")
+
 // REPL represents the Read-Eval-Print Loop for MCP interaction
 type REPL struct {
-	client   *Client
-	logger   *Logger
-	rl       *readline.Instance
-	stopChan chan struct{}
-	wg       sync.WaitGroup
+	client          *Client
+	logger          *Logger
+	rl              *readline.Instance
+	stopChan        chan struct{}
+	wg              sync.WaitGroup
+	commandHandlers map[string]commandHandler
 }
 
 // NewREPL creates a new REPL instance
 func NewREPL(client *Client, logger *Logger) *REPL {
-	return &REPL{
+	r := &REPL{
 		client:   client,
 		logger:   logger,
 		stopChan: make(chan struct{}),
 	}
+	r.commandHandlers = r.buildCommandHandlers()
+	return r
 }
 
 // Run starts the REPL
@@ -97,7 +103,7 @@ func (r *REPL) Run(ctx context.Context) error {
 
 		// Parse and execute command
 		if err := r.executeCommand(ctx, input); err != nil {
-			if err.Error() == "exit" {
+			if errors.Is(err, errExit) {
 				close(r.stopChan)
 				r.wg.Wait()
 				r.logger.Info("Goodbye!")
@@ -299,10 +305,10 @@ func (r *REPL) buildCommandHandlers() map[string]commandHandler {
 			return r.showHelp()
 		}},
 		"exit": {minArgs: 1, handler: func(ctx context.Context, parts []string) error {
-			return fmt.Errorf("exit")
+			return errExit
 		}},
 		"quit": {minArgs: 1, handler: func(ctx context.Context, parts []string) error {
-			return fmt.Errorf("exit")
+			return errExit
 		}},
 		"list": {
 			minArgs: 2,
@@ -357,9 +363,8 @@ func (r *REPL) executeCommand(ctx context.Context, input string) error {
 	}
 
 	command := strings.ToLower(parts[0])
-	handlers := r.buildCommandHandlers()
 
-	handler, exists := handlers[command]
+	handler, exists := r.commandHandlers[command]
 	if !exists {
 		return fmt.Errorf("unknown command: %s. Type 'help' for available commands", command)
 	}
