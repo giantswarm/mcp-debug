@@ -18,14 +18,6 @@ const (
 	colorGray   = "\033[90m"
 )
 
-// MCP method constants
-const (
-	methodInitialize                 = "initialize"
-	notificationToolsListChanged     = "notifications/tools/list_changed"
-	notificationResourcesListChanged = "notifications/resources/list_changed"
-	notificationPromptsListChanged   = "notifications/prompts/list_changed"
-)
-
 // Logger provides formatted logging for the agent
 type Logger struct {
 	verbose     bool

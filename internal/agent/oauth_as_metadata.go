@@ -29,9 +29,6 @@ import (
 	"time"
 )
 
-// PKCE code challenge method constant
-const pkceMethodS256 = "S256"
-
 // AuthorizationServerMetadata represents OAuth 2.0 Authorization Server Metadata
 // as defined in RFC 8414 and OpenID Connect Discovery 1.0.
 type AuthorizationServerMetadata struct {

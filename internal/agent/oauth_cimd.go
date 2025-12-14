@@ -22,14 +22,6 @@ import (
 	"time"
 )
 
-// URL scheme and host constants for CIMD validation
-const (
-	schemeHTTPS  = "https"
-	schemeHTTP   = "http"
-	hostLocal    = "localhost"
-	hostLoopback = "127.0.0.1"
-)
-
 // ClientMetadataDocument represents an OAuth Client ID Metadata Document
 // as defined in draft-ietf-oauth-client-id-metadata-document-00.
 //

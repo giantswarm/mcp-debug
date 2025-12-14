@@ -37,12 +37,19 @@ func parseToolArgs(argsStr string, toolName string) (map[string]interface{}, err
 }
 
 // displayContent displays a single content item with an optional prefix.
-// Use empty string for no prefix, or "Content: " for prompt message display.
+//
+// Prefix behavior:
+//   - Empty string (""):  Text content is passed to displayTextContent() for JSON
+//     pretty-printing. This is used for tool results where JSON responses are common.
+//   - Non-empty prefix (e.g., "Content: "): Text is printed as-is with the prefix.
+//     This is used for prompt messages where the raw text should be displayed.
 func displayContent(content mcp.Content, prefix string) {
 	if textContent, ok := mcp.AsTextContent(content); ok {
 		if prefix == "" {
+			// No prefix: attempt JSON pretty-printing for tool results
 			displayTextContent(textContent.Text)
 		} else {
+			// With prefix: display raw text (used for prompt messages)
 			fmt.Printf("%s%s\n", prefix, textContent.Text)
 		}
 		return
