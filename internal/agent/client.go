@@ -169,34 +169,27 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 		clientID := c.oauthConfig.ClientID
 
 		if clientID == "" && !c.oauthConfig.DisableCIMD {
-			// Check if CIMD should be used
+			// Use CIMD (Client ID Metadata Documents) approach
+			// If an explicit CIMD URL is provided, use it; otherwise use the default
 			cimdURL := c.oauthConfig.ClientIDMetadataURL
-
-			// Auto-detect CIMD URL: if no explicit URL is set but AS supports CIMD,
-			// use the default mcp-debug client metadata URL hosted on GitHub Pages
-			if cimdURL == "" && discoveredMetadata != nil {
-				// Attempt AS metadata discovery to check for CIMD support
-				if !c.oauthConfig.SkipAuthServerDiscovery {
-					asMetadata, err := discoverASMetadataFromResource(ctx, discoveredMetadata, c.oauthConfig.PreferredAuthServer, c.logger)
-					if err == nil && asMetadata != nil && asMetadata.ClientIDMetadataDocumentSupported {
-						cimdURL = DefaultClientIDMetadataURL
-						c.logger.Info("Authorization server supports CIMD - using default metadata URL")
-					}
-				}
+			if cimdURL == "" {
+				// Use the default mcp-debug client metadata URL hosted on GitHub Pages
+				// The AS will fetch our client metadata from this URL
+				// If the AS doesn't support CIMD, mcp-go will fall back to DCR
+				cimdURL = DefaultClientIDMetadataURL
 			}
-
-			if cimdURL != "" {
-				// Use Client ID Metadata Documents (CIMD)
-				// The Authorization Server will fetch client metadata from this HTTPS URL
-				clientID = cimdURL
-				c.logger.Info("Using Client ID Metadata Documents (CIMD): %s", clientID)
-			}
+			clientID = cimdURL
+			c.logger.Info("Using Client ID Metadata Documents (CIMD): %s", clientID)
 		}
 
-		if clientID != "" && !strings.HasPrefix(clientID, "https://") {
-			c.logger.Info("Using pre-registered client ID: %s", clientID)
-		} else if clientID == "" {
+		// Log the client ID selection for debugging
+		switch {
+		case clientID == "":
 			c.logger.Info("No client ID configured - will attempt Dynamic Client Registration")
+		case strings.HasPrefix(clientID, "https://"):
+			// CIMD case - already logged above
+		default:
+			c.logger.Info("Using pre-registered client ID: %s", clientID)
 		}
 
 		// Create mcp-go OAuth config

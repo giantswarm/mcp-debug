@@ -352,33 +352,3 @@ func selectAuthorizationServer(metadata *ProtectedResourceMetadata, preferredSer
 	// Default: use first server in the list
 	return metadata.AuthorizationServers[0], nil
 }
-
-// discoverASMetadataFromResource discovers authorization server metadata
-// from the protected resource metadata by selecting an authorization server
-// and fetching its metadata.
-//
-// This function is used for CIMD auto-detection: if the authorization server
-// supports Client ID Metadata Documents, mcp-debug can use the default CIMD URL.
-func discoverASMetadataFromResource(ctx context.Context, resourceMetadata *ProtectedResourceMetadata, preferredServer string, logger *Logger) (*AuthorizationServerMetadata, error) {
-	if resourceMetadata == nil {
-		return nil, fmt.Errorf("no protected resource metadata available")
-	}
-
-	// Select authorization server
-	asURL, err := selectAuthorizationServer(resourceMetadata, preferredServer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select authorization server: %w", err)
-	}
-
-	if logger != nil {
-		logger.InfoVerbose("Discovering AS metadata from: %s", asURL)
-	}
-
-	// Discover AS metadata
-	asMetadata, err := DiscoverAuthorizationServerMetadata(ctx, asURL, logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to discover AS metadata: %w", err)
-	}
-
-	return asMetadata, nil
-}

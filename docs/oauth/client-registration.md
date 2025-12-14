@@ -168,7 +168,7 @@ This document contains:
 
 ### How It Works
 
-When connecting to an OAuth-protected MCP server, `mcp-debug` follows this logic for CIMD:
+When connecting to an OAuth-protected MCP server, `mcp-debug` follows this logic for client identification:
 
 ```mermaid
 graph TD
@@ -178,35 +178,36 @@ graph TD
     D -->|Yes| E[Try DCR]
     D -->|No| F{Explicit CIMD<br/>URL provided?}
     F -->|Yes| G[Use Provided URL]
-    F -->|No| H{AS supports<br/>CIMD?}
-    H -->|Yes| I[Use Default CIMD URL]
-    H -->|No| E
+    F -->|No| H[Use Default CIMD URL]
     
-    C --> J[Proceed to Authorization]
-    G --> J
-    I --> J
-    E --> J
+    C --> I[Proceed to Authorization]
+    G --> I
+    H --> I
+    E --> I
     
-    style I fill:#90EE90
+    H --> J{AS rejects<br/>CIMD?}
+    J -->|Yes| E
+    J -->|No| I
+    
+    style H fill:#90EE90
     style G fill:#87CEEB
 ```
 
-**Auto-Detection:** When connecting to an authorization server that advertises `client_id_metadata_document_supported: true`, mcp-debug automatically uses the official CIMD URL without any configuration.
+**CIMD by Default:** When no client ID is configured, `mcp-debug` automatically uses CIMD with the official metadata URL. If the authorization server doesn't support CIMD, the OAuth flow will fall back to Dynamic Client Registration (DCR).
 
 ### Usage
 
 **Automatic (recommended):**
 
-If the authorization server supports CIMD, it's used automatically:
+CIMD is used by default when no client ID is configured:
 
 ```bash
 ./mcp-debug --oauth --endpoint https://mcp.example.com/mcp
 ```
 
-Output when CIMD is auto-detected:
+Output:
 
 ```
-[INFO] Authorization server supports CIMD - using default metadata URL
 [INFO] Using Client ID Metadata Documents (CIMD): https://giantswarm.github.io/mcp-debug/client.json
 ```
 
