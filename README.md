@@ -48,9 +48,28 @@ Connect to a protected MCP server with automatic discovery:
 This automatically:
 - Discovers the authorization server (RFC 9728)
 - Validates PKCE support (required by MCP spec)
-- Registers as a client if needed (Dynamic Client Registration)
+- Uses the official [Client ID Metadata Document](https://giantswarm.github.io/mcp-debug/client.json) (CIMD)
+- Falls back to Dynamic Client Registration if CIMD is not supported
 - Opens your browser for authorization
 - Connects with audience-bound tokens (RFC 8707)
+
+#### Client ID Metadata Document (CIMD)
+
+mcp-debug uses CIMD by default for OAuth authentication. The official client metadata is hosted at:
+
+**https://giantswarm.github.io/mcp-debug/client.json**
+
+This allows OAuth-protected MCP servers to identify mcp-debug without requiring pre-registration. The authorization server fetches the metadata from this URL and displays "MCP Debugger CLI" on the consent screen.
+
+If you need to use a custom CIMD or disable it:
+
+```bash
+# Use a custom CIMD URL
+./mcp-debug --oauth --oauth-client-id-metadata-url https://example.com/my-client.json --endpoint https://mcp.example.com/mcp
+
+# Disable CIMD and force Dynamic Client Registration
+./mcp-debug --oauth --oauth-disable-cimd --endpoint https://mcp.example.com/mcp
+```
 
 See the **[OAuth Documentation](./docs/oauth/)** for detailed guides, examples, and troubleshooting.
 
