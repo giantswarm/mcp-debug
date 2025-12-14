@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+// DefaultClientIDMetadataURL is the official CIMD URL hosted on GitHub Pages.
+// This URL contains the client metadata for mcp-debug and is used when
+// the authorization server supports Client ID Metadata Documents (CIMD).
+const DefaultClientIDMetadataURL = "https://giantswarm.github.io/mcp-debug/client.json"
+
 // OAuthConfig contains OAuth 2.1 configuration for authenticating with MCP servers
 type OAuthConfig struct {
 	// Enabled indicates whether OAuth authentication should be used

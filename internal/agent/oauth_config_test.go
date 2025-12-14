@@ -472,3 +472,34 @@ func TestOAuthConfig_RegistrationToken(t *testing.T) {
 		})
 	}
 }
+
+func TestDefaultClientIDMetadataURL(t *testing.T) {
+	// Verify the default CIMD URL is correct
+	expectedURL := "https://giantswarm.github.io/mcp-debug/client.json"
+
+	if DefaultClientIDMetadataURL != expectedURL {
+		t.Errorf("DefaultClientIDMetadataURL = %q, want %q", DefaultClientIDMetadataURL, expectedURL)
+	}
+
+	// Verify the URL is valid for CIMD
+	err := ValidateClientIDURL(DefaultClientIDMetadataURL)
+	if err != nil {
+		t.Errorf("DefaultClientIDMetadataURL validation failed: %v", err)
+	}
+}
+
+func TestOAuthConfig_ValidateWithDefaultCIMDURL(t *testing.T) {
+	// Test that the config validates when using the default CIMD URL
+	config := &OAuthConfig{
+		Enabled:             true,
+		RedirectURL:         "http://localhost:8765/callback",
+		ClientIDMetadataURL: DefaultClientIDMetadataURL,
+	}
+
+	config = config.WithDefaults()
+
+	err := config.Validate()
+	if err != nil {
+		t.Errorf("Validate() with DefaultClientIDMetadataURL failed: %v", err)
+	}
+}
