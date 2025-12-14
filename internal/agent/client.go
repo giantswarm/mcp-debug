@@ -28,6 +28,7 @@ type Client struct {
 	serverCapabilities *mcp.ServerCapabilities
 	oauthConfig        *OAuthConfig
 	version            string
+	resourceURI        string // RFC 8707 resource URI for OAuth flows
 }
 
 // ClientConfig holds configuration for creating a new Client
@@ -122,10 +123,17 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 		tokenStore := client.NewMemoryTokenStore()
 
 		// Derive or use configured resource URI for RFC 8707
+		// Priority order:
+		// 1. Explicitly configured ResourceURI
+		// 2. Resource from Protected Resource Metadata (RFC 9728)
+		// 3. Derived from endpoint URL
 		var resourceURI string
 		if c.oauthConfig.ResourceURI != "" {
 			resourceURI = c.oauthConfig.ResourceURI
 			c.logger.Info("Using configured resource URI: %s", resourceURI)
+		} else if discoveredMetadata != nil && discoveredMetadata.Resource != "" {
+			resourceURI = discoveredMetadata.Resource
+			c.logger.Info("Using resource URI from Protected Resource Metadata: %s", resourceURI)
 		} else if !c.oauthConfig.SkipResourceParam {
 			var err error
 			resourceURI, err = deriveResourceURI(c.endpoint)
@@ -138,6 +146,9 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 		if c.oauthConfig.SkipResourceParam {
 			c.logger.Warning("RFC 8707 resource parameter disabled - this weakens token security")
 		}
+
+		// Store resourceURI for use in OAuth authorization flow
+		c.resourceURI = resourceURI
 
 		// Select scopes using MCP spec priority order
 		// Note: WWW-Authenticate challenge is not available during proactive connection

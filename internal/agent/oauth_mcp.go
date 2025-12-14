@@ -84,6 +84,21 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 		return fmt.Errorf("failed to get authorization URL: %w", err)
 	}
 
+	// Add RFC 8707 resource parameter to authorization URL
+	// This MUST match the resource parameter sent during token exchange
+	if !c.oauthConfig.SkipResourceParam && c.resourceURI != "" {
+		parsedURL, err := url.Parse(authURL)
+		if err == nil {
+			q := parsedURL.Query()
+			q.Set("resource", c.resourceURI)
+			parsedURL.RawQuery = q.Encode()
+			authURL = parsedURL.String()
+			c.logger.Info("Added RFC 8707 resource parameter to authorization URL: %s", c.resourceURI)
+		} else {
+			c.logger.Warning("Failed to add resource parameter to URL: %v", err)
+		}
+	}
+
 	// Add nonce parameter for OIDC flows
 	if c.oauthConfig.UseOIDC && nonce != "" {
 		parsedURL, err := url.Parse(authURL)
