@@ -1,0 +1,13 @@
+{
+  "client_id": "https://giantswarm.github.io/mcp-debug/client.json",
+  "client_name": "MCP Debugger CLI",
+  "client_uri": "https://github.com/giantswarm/mcp-debug",
+  "redirect_uris": [
+    "http://localhost:8765/callback",
+    "http://127.0.0.1:8765/callback"
+  ],
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none"
+}
+

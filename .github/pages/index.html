@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Debugger CLI - OAuth Client</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #e0e0e0;
+        }
+        .container {
+            max-width: 800px;
+            padding: 40px;
+            text-align: center;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: #00d9ff;
+        }
+        .subtitle {
+            font-size: 1.2rem;
+            color: #a0a0a0;
+            margin-bottom: 2rem;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 30px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .card h2 {
+            color: #00d9ff;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+        .card p {
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+        code {
+            background: rgba(0, 217, 255, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            color: #00d9ff;
+        }
+        a {
+            color: #00d9ff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .links {
+            margin-top: 2rem;
+        }
+        .links a {
+            display: inline-block;
+            padding: 10px 24px;
+            margin: 8px;
+            background: rgba(0, 217, 255, 0.1);
+            border: 1px solid #00d9ff;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        .links a:hover {
+            background: rgba(0, 217, 255, 0.2);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MCP Debugger CLI</h1>
+        <p class="subtitle">OAuth Client Metadata for MCP 2025-11-25 Specification</p>
+        
+        <div class="card">
+            <h2>Client ID Metadata Document</h2>
+            <p>
+                This page hosts the <a href="https://datatracker.ietf.org/doc/draft-ietf-oauth-client-id-metadata-document/">Client ID Metadata Document</a> 
+                for <code>mcp-debug</code>, enabling OAuth authentication with MCP servers that support CIMD.
+            </p>
+            <p>
+                <strong>Client ID:</strong><br>
+                <code>https://giantswarm.github.io/mcp-debug/client.json</code>
+            </p>
+        </div>
+
+        <div class="card">
+            <h2>How It Works</h2>
+            <p>
+                When connecting to an OAuth-protected MCP server, <code>mcp-debug</code> uses this URL as its client identifier.
+                The authorization server fetches the metadata from this URL to learn about the client's configuration,
+                including allowed redirect URIs and grant types.
+            </p>
+            <p>
+                This approach follows the <a href="https://spec.modelcontextprotocol.io/specification/2025-11-25/">MCP 2025-11-25 specification</a>
+                for client registration without requiring pre-registration with each authorization server.
+            </p>
+        </div>
+
+        <div class="links">
+            <a href="client.json">View Client Metadata</a>
+            <a href="https://github.com/giantswarm/mcp-debug">GitHub Repository</a>
+            <a href="https://github.com/giantswarm/mcp-debug/blob/main/docs/oauth/client-registration.md">Documentation</a>
+        </div>
+    </div>
+</body>
+</html>
+

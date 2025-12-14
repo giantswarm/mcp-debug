@@ -138,78 +138,152 @@ Per OAuth 2.1, native/desktop applications like `mcp-debug` should use public cl
 Instead of registering with the authorization server, you host a metadata document describing your client:
 
 ```
-Client ID: https://app.example.com/oauth/client-metadata.json
+Client ID: https://giantswarm.github.io/mcp-debug/client.json
 ```
 
-The authorization server fetches this document to learn about your client.
+The authorization server fetches this document to learn about your client's configuration, including allowed redirect URIs and grant types.
 
-### Current Status
+### Official mcp-debug Client Metadata
 
-`mcp-debug` currently **detects** authorization server support for CIMD but does not yet implement full client-side CIMD functionality.
+`mcp-debug` hosts an official Client ID Metadata Document on GitHub Pages:
 
-**Support Detection:**
+**URL:** `https://giantswarm.github.io/mcp-debug/client.json`
 
-```bash
-./mcp-debug --oauth --verbose --endpoint https://mcp.example.com/mcp
-```
-
-If the authorization server supports CIMD:
-
-```
-[INFO] Authorization server metadata:
-[INFO]   client_id_metadata_document_supported: true
-[INFO]   ... (other metadata)
-```
-
-**Implementation Status:**
-
-- ✅ Detection of AS support in metadata
-- ⏳ Hosting/generating metadata documents (planned)
-- ⏳ Using HTTPS URL as client_id (planned)
-
-### How It Will Work (When Implemented)
-
-**Step 1: Generate Metadata Document**
-
-```bash
-# Generate metadata JSON (future feature)
-./mcp-debug --oauth-generate-client-metadata > client-metadata.json
-```
-
-**Step 2: Host the Document**
-
-Host at an HTTPS URL (e.g., `https://yourdomain.com/client-metadata.json`):
+This document contains:
 
 ```json
 {
-  "client_id": "https://yourdomain.com/client-metadata.json",
-  "client_name": "mcp-debug",
+  "client_id": "https://giantswarm.github.io/mcp-debug/client.json",
+  "client_name": "MCP Debugger CLI",
   "client_uri": "https://github.com/giantswarm/mcp-debug",
-  "logo_uri": "https://giantswarm.io/logo.png",
   "redirect_uris": [
-    "http://localhost:8765/callback"
+    "http://localhost:8765/callback",
+    "http://127.0.0.1:8765/callback"
   ],
-  "grant_types": ["authorization_code", "refresh_token"],
+  "grant_types": ["authorization_code"],
   "response_types": ["code"],
   "token_endpoint_auth_method": "none"
 }
 ```
 
-**Step 3: Use URL as Client ID**
+### How It Works
+
+When connecting to an OAuth-protected MCP server, `mcp-debug` follows this logic for CIMD:
+
+```mermaid
+graph TD
+    A[OAuth Flow Start] --> B{Pre-registered<br/>client ID?}
+    B -->|Yes| C[Use Pre-Registered ID]
+    B -->|No| D{CIMD<br/>disabled?}
+    D -->|Yes| E[Try DCR]
+    D -->|No| F{Explicit CIMD<br/>URL provided?}
+    F -->|Yes| G[Use Provided URL]
+    F -->|No| H{AS supports<br/>CIMD?}
+    H -->|Yes| I[Use Default CIMD URL]
+    H -->|No| E
+    
+    C --> J[Proceed to Authorization]
+    G --> J
+    I --> J
+    E --> J
+    
+    style I fill:#90EE90
+    style G fill:#87CEEB
+```
+
+**Auto-Detection:** When connecting to an authorization server that advertises `client_id_metadata_document_supported: true`, mcp-debug automatically uses the official CIMD URL without any configuration.
+
+### Usage
+
+**Automatic (recommended):**
+
+If the authorization server supports CIMD, it's used automatically:
 
 ```bash
-# Use HTTPS URL as client_id (future feature)
+./mcp-debug --oauth --endpoint https://mcp.example.com/mcp
+```
+
+Output when CIMD is auto-detected:
+
+```
+[INFO] Authorization server supports CIMD - using default metadata URL
+[INFO] Using Client ID Metadata Documents (CIMD): https://giantswarm.github.io/mcp-debug/client.json
+```
+
+**Explicit CIMD URL:**
+
+To use a custom metadata document:
+
+```bash
 ./mcp-debug --oauth \
   --oauth-client-id-metadata-url "https://yourdomain.com/client-metadata.json" \
   --endpoint https://mcp.example.com/mcp
 ```
 
+**Disable CIMD:**
+
+To force Dynamic Client Registration instead:
+
+```bash
+./mcp-debug --oauth \
+  --oauth-disable-cimd \
+  --endpoint https://mcp.example.com/mcp
+```
+
 ### Benefits of CIMD
 
-- **No pre-registration**: Self-describing client
-- **Distributed trust**: You control client metadata
-- **HTTPS-based**: Leverages existing web infrastructure
+- **No pre-registration**: Self-describing client - works out of the box
+- **Distributed trust**: Client metadata controlled by mcp-debug maintainers
+- **HTTPS-based**: Leverages existing web infrastructure (GitHub Pages)
 - **Decentralized**: No central registration authority needed
+- **Zero configuration**: Works automatically when AS supports CIMD
+
+### Hosting Your Own Client Metadata
+
+If you need to customize the client metadata (e.g., different redirect URIs):
+
+**Step 1: Create the Metadata Document**
+
+```json
+{
+  "client_id": "https://yourdomain.com/mcp-client.json",
+  "client_name": "My MCP Client",
+  "client_uri": "https://yourdomain.com",
+  "redirect_uris": [
+    "http://localhost:9000/callback"
+  ],
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none"
+}
+```
+
+**Step 2: Host it at an HTTPS URL**
+
+The `client_id` field MUST match the URL where the document is hosted.
+
+**Step 3: Use the Custom URL**
+
+```bash
+./mcp-debug --oauth \
+  --oauth-client-id-metadata-url "https://yourdomain.com/mcp-client.json" \
+  --oauth-redirect-url "http://localhost:9000/callback" \
+  --endpoint https://mcp.example.com/mcp
+```
+
+### Security Model
+
+Using CIMD is secure because:
+
+1. **Redirect URI Validation**: The authorization server fetches metadata from the CIMD URL and validates redirect URIs against the list in the document. Attackers cannot redirect to their own sites.
+
+2. **PKCE Enforcement**: PKCE is mandatory for public clients. Even if someone intercepts an auth code on localhost, they cannot exchange it without the code_verifier.
+
+3. **Trusted Client Name**: The consent screen shows "MCP Debugger CLI" which is fetched from the controlled GitHub Pages URL, preventing impersonation.
+
+4. **Localhost-only Redirects**: Only localhost callbacks are allowed in the official metadata, limiting the attack surface.
+
+5. **HTTPS Required**: The CIMD specification requires HTTPS URLs, ensuring the metadata cannot be tampered with in transit.
 
 ### Security Requirements
 
@@ -218,7 +292,7 @@ Per the specification:
 - Client ID URL **MUST** use HTTPS scheme
 - URL **MUST** contain a path component
 - Authorization server **MUST** protect against SSRF attacks
-- Localhost redirect URIs have security implications
+- Localhost redirect URIs are acceptable for native/CLI applications
 
 ## Dynamic Client Registration
 
@@ -546,9 +620,31 @@ INFO: Dynamic Client Registration not available
 
 ### CIMD Not Working
 
-**Current Status**: CIMD detection is implemented, but full CIMD support (hosting/using metadata URLs) is planned for future releases.
+**Problem:**
 
-**Workaround**: Use DCR or pre-registration:
+```
+[INFO] No client ID configured - will attempt Dynamic Client Registration
+```
+
+CIMD was not used even though expected.
+
+**Possible Causes:**
+
+1. **AS doesn't support CIMD**: Check if the authorization server advertises `client_id_metadata_document_supported: true`
+
+2. **CIMD is disabled**: Check if `--oauth-disable-cimd` flag is set
+
+3. **Resource metadata discovery failed**: CIMD auto-detection requires successful RFC 9728 discovery
+
+**Solution**: Explicitly specify the CIMD URL:
+
+```bash
+./mcp-debug --oauth \
+  --oauth-client-id-metadata-url "https://giantswarm.github.io/mcp-debug/client.json" \
+  --endpoint https://mcp.example.com/mcp
+```
+
+**Alternative**: Use DCR or pre-registration:
 
 ```bash
 # Option 1: DCR
