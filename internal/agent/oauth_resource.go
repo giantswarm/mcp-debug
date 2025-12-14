@@ -53,7 +53,7 @@ func deriveResourceURI(endpoint string) (string, error) {
 	}
 
 	// Standard ports that should be omitted
-	omitPort := (scheme == "https" && port == "443") || (scheme == "http" && port == "80")
+	omitPort := (scheme == schemeHTTPS && port == "443") || (scheme == schemeHTTP && port == "80")
 
 	// Reconstruct host with normalized hostname and conditional port
 	// net.SplitHostPort strips brackets from IPv6 addresses, so we need to add them back

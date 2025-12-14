@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// testRegistrationTokenConfig is a test registration token
+const testRegistrationTokenConfig = "test-registration-token-12345"
+
 func TestOAuthConfig_Validate(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -440,7 +443,7 @@ func TestOAuthConfig_RegistrationToken(t *testing.T) {
 	}{
 		{
 			name:              "valid config with registration token",
-			registrationToken: "test-registration-token-12345",
+			registrationToken: testRegistrationTokenConfig,
 			wantErr:           false,
 		},
 		{

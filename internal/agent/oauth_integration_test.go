@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// testCIMDURL is a test Client ID Metadata Document URL
+const testCIMDURL = "https://app.example.com/oauth/client-metadata.json"
+
 // TestOAuthEndToEndFlow tests the complete OAuth 2.1 flow with mock servers
 // Verifies compliance with:
 // - RFC 6749 (OAuth 2.0)
@@ -401,15 +404,15 @@ func TestClientRegistrationPriority(t *testing.T) {
 		{
 			name:                "priority_2_cimd_when_no_client_id",
 			clientID:            "",
-			clientIDMetadataURL: "https://app.example.com/oauth/client-metadata.json",
+			clientIDMetadataURL: testCIMDURL,
 			disableCIMD:         false,
-			expectedClientID:    "https://app.example.com/oauth/client-metadata.json",
+			expectedClientID:    testCIMDURL,
 			description:         "CIMD URL should be used as client_id when no pre-registered client ID",
 		},
 		{
 			name:                "priority_1_over_priority_2",
 			clientID:            "pre-registered-client-123",
-			clientIDMetadataURL: "https://app.example.com/oauth/client-metadata.json",
+			clientIDMetadataURL: testCIMDURL,
 			disableCIMD:         false,
 			expectedClientID:    "pre-registered-client-123",
 			description:         "Pre-registered client ID takes priority over CIMD",
@@ -417,7 +420,7 @@ func TestClientRegistrationPriority(t *testing.T) {
 		{
 			name:                "cimd_disabled_falls_back_to_dcr",
 			clientID:            "",
-			clientIDMetadataURL: "https://app.example.com/oauth/client-metadata.json",
+			clientIDMetadataURL: testCIMDURL,
 			disableCIMD:         true,
 			expectedClientID:    "",
 			description:         "CIMD URL should be ignored when DisableCIMD is true, falling back to DCR",
@@ -478,7 +481,7 @@ func TestCIMDWithMockAuthServer(t *testing.T) {
 
 	// Create a valid client metadata URL (using mock server)
 	// Note: In real usage, this would point to where the client hosts their metadata
-	clientMetadataURL := "https://app.example.com/oauth/client-metadata.json"
+	clientMetadataURL := testCIMDURL
 
 	config := &OAuthConfig{
 		Enabled:             true,
@@ -534,7 +537,7 @@ func TestCIMDValidationInConfig(t *testing.T) {
 	}{
 		{
 			name:                "valid_https_url_with_path",
-			clientIDMetadataURL: "https://app.example.com/oauth/client-metadata.json",
+			clientIDMetadataURL: testCIMDURL,
 			wantErr:             false,
 		},
 		{

@@ -8,48 +8,79 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// handleCallTool executes a tool with the given arguments
-func (r *REPL) handleCallTool(ctx context.Context, toolName string, argsStr string) error {
-	// Check if server supports tools
-	if !r.client.ServerSupportsTools() {
-		return fmt.Errorf("server does not support tools capability")
-	}
-
-	// Find the tool to validate it exists
+// findTool finds a tool by name in the cache
+func (r *REPL) findTool(toolName string) *mcp.Tool {
 	r.client.mu.RLock()
-	var tool *mcp.Tool
+	defer r.client.mu.RUnlock()
+
 	for _, t := range r.client.toolCache {
 		if t.Name == toolName {
-			tool = &t
-			break
+			return &t
 		}
 	}
-	r.client.mu.RUnlock()
+	return nil
+}
 
-	if tool == nil {
-		return fmt.Errorf("tool not found: %s", toolName)
+// parseToolArgs parses JSON arguments for a tool call
+func parseToolArgs(argsStr string, toolName string) (map[string]interface{}, error) {
+	if argsStr == "" {
+		return nil, nil
 	}
 
-	// Parse arguments
 	var args map[string]interface{}
-	if argsStr != "" {
-		// Try to parse as JSON
-		if err := json.Unmarshal([]byte(argsStr), &args); err != nil {
-			// If not valid JSON, provide help
-			fmt.Println("Error: Arguments must be valid JSON")
-			fmt.Printf("Example: call %s {\"param1\": \"value1\", \"param2\": 123}\n", toolName)
-			return fmt.Errorf("invalid JSON arguments: %w", err)
+	if err := json.Unmarshal([]byte(argsStr), &args); err != nil {
+		fmt.Println("Error: Arguments must be valid JSON")
+		fmt.Printf("Example: call %s {\"param1\": \"value1\", \"param2\": 123}\n", toolName)
+		return nil, fmt.Errorf("invalid JSON arguments: %w", err)
+	}
+	return args, nil
+}
+
+// displayContent displays a single content item with an optional prefix.
+//
+// Prefix behavior:
+//   - Empty string (""):  Text content is passed to displayTextContent() for JSON
+//     pretty-printing. This is used for tool results where JSON responses are common.
+//   - Non-empty prefix (e.g., "Content: "): Text is printed as-is with the prefix.
+//     This is used for prompt messages where the raw text should be displayed.
+func displayContent(content mcp.Content, prefix string) {
+	if textContent, ok := mcp.AsTextContent(content); ok {
+		if prefix == "" {
+			// No prefix: attempt JSON pretty-printing for tool results
+			displayTextContent(textContent.Text)
+		} else {
+			// With prefix: display raw text (used for prompt messages)
+			fmt.Printf("%s%s\n", prefix, textContent.Text)
 		}
+		return
 	}
-
-	// Execute the tool
-	fmt.Printf("Executing tool: %s...\n", toolName)
-	result, err := r.client.CallTool(ctx, toolName, args)
-	if err != nil {
-		return fmt.Errorf("tool execution failed: %w", err)
+	if imageContent, ok := mcp.AsImageContent(content); ok {
+		fmt.Printf("%s[Image: MIME type %s, %d bytes]\n", prefix, imageContent.MIMEType, len(imageContent.Data))
+		return
 	}
+	if audioContent, ok := mcp.AsAudioContent(content); ok {
+		fmt.Printf("%s[Audio: MIME type %s, %d bytes]\n", prefix, audioContent.MIMEType, len(audioContent.Data))
+		return
+	}
+	if resource, ok := mcp.AsEmbeddedResource(content); ok {
+		fmt.Printf("%s[Embedded Resource: %v]\n", prefix, resource.Resource)
+		return
+	}
+	fmt.Printf("%s%+v\n", prefix, content)
+}
 
-	// Display results
+// displayTextContent displays text content, pretty-printing JSON if possible
+func displayTextContent(text string) {
+	var jsonData interface{}
+	if err := json.Unmarshal([]byte(text), &jsonData); err == nil {
+		fmt.Println(PrettyJSON(jsonData))
+	} else {
+		fmt.Println(text)
+	}
+}
+
+// displayToolResult displays the result of a tool call
+func displayToolResult(result *mcp.CallToolResult) {
 	if result.IsError {
 		fmt.Println("Tool returned an error:")
 		for _, content := range result.Content {
@@ -57,46 +88,60 @@ func (r *REPL) handleCallTool(ctx context.Context, toolName string, argsStr stri
 				fmt.Printf("  %s\n", textContent.Text)
 			}
 		}
-	} else {
-		fmt.Println("Result:")
-		for _, content := range result.Content {
-			if textContent, ok := mcp.AsTextContent(content); ok {
-				// Try to pretty-print if it's JSON
-				var jsonData interface{}
-				if err := json.Unmarshal([]byte(textContent.Text), &jsonData); err == nil {
-					fmt.Println(PrettyJSON(jsonData))
-				} else {
-					fmt.Println(textContent.Text)
-				}
-			} else if imageContent, ok := mcp.AsImageContent(content); ok {
-				fmt.Printf("[Image: MIME type %s, %d bytes]\n", imageContent.MIMEType, len(imageContent.Data))
-			} else if audioContent, ok := mcp.AsAudioContent(content); ok {
-				fmt.Printf("[Audio: MIME type %s, %d bytes]\n", audioContent.MIMEType, len(audioContent.Data))
-			}
-		}
+		return
 	}
 
+	fmt.Println("Result:")
+	for _, content := range result.Content {
+		displayContent(content, "")
+	}
+}
+
+// handleCallTool executes a tool with the given arguments
+func (r *REPL) handleCallTool(ctx context.Context, toolName string, argsStr string) error {
+	if !r.client.ServerSupportsTools() {
+		return fmt.Errorf("server does not support tools capability")
+	}
+
+	if tool := r.findTool(toolName); tool == nil {
+		return fmt.Errorf("tool not found: %s", toolName)
+	}
+
+	args, err := parseToolArgs(argsStr, toolName)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Executing tool: %s...\n", toolName)
+	result, err := r.client.CallTool(ctx, toolName, args)
+	if err != nil {
+		return fmt.Errorf("tool execution failed: %w", err)
+	}
+
+	displayToolResult(result)
+	return nil
+}
+
+// findResource finds a resource by URI in the cache
+func (r *REPL) findResource(uri string) *mcp.Resource {
+	r.client.mu.RLock()
+	defer r.client.mu.RUnlock()
+
+	for _, res := range r.client.resourceCache {
+		if res.URI == uri {
+			return &res
+		}
+	}
 	return nil
 }
 
 // handleGetResource retrieves and displays a resource
 func (r *REPL) handleGetResource(ctx context.Context, uri string) error {
-	// Check if server supports resources
 	if !r.client.ServerSupportsResources() {
 		return fmt.Errorf("server does not support resources capability")
 	}
 
-	// Find the resource to validate it exists
-	r.client.mu.RLock()
-	var resource *mcp.Resource
-	for _, res := range r.client.resourceCache {
-		if res.URI == uri {
-			resource = &res
-			break
-		}
-	}
-	r.client.mu.RUnlock()
-
+	resource := r.findResource(uri)
 	if resource == nil {
 		return fmt.Errorf("resource not found: %s", uri)
 	}
@@ -131,51 +176,47 @@ func (r *REPL) handleGetResource(ctx context.Context, uri string) error {
 	return nil
 }
 
-// handleGetPrompt retrieves and displays a prompt with arguments
-func (r *REPL) handleGetPrompt(ctx context.Context, promptName string, argsStr string) error {
-	// Check if server supports prompts
-	if !r.client.ServerSupportsPrompts() {
-		return fmt.Errorf("server does not support prompts capability")
-	}
-
-	// Find the prompt to validate it exists
+// findPrompt finds a prompt by name in the cache
+func (r *REPL) findPrompt(promptName string) *mcp.Prompt {
 	r.client.mu.RLock()
-	var prompt *mcp.Prompt
+	defer r.client.mu.RUnlock()
+
 	for _, p := range r.client.promptCache {
 		if p.Name == promptName {
-			prompt = &p
-			break
+			return &p
 		}
 	}
-	r.client.mu.RUnlock()
+	return nil
+}
 
-	if prompt == nil {
-		return fmt.Errorf("prompt not found: %s", promptName)
+// showPromptArgumentHelp displays help for prompt arguments
+func showPromptArgumentHelp(promptName string, arguments []mcp.PromptArgument) {
+	fmt.Println("Error: Arguments must be valid JSON")
+	fmt.Printf("Example: prompt %s {\"arg1\": \"value1\", \"arg2\": \"value2\"}\n", promptName)
+
+	if len(arguments) == 0 {
+		return
 	}
 
-	// Parse arguments
+	fmt.Println("Required arguments:")
+	for _, arg := range arguments {
+		if arg.Required {
+			fmt.Printf("  - %s: %s\n", arg.Name, arg.Description)
+		}
+	}
+}
+
+// parsePromptArgs parses and validates prompt arguments
+func parsePromptArgs(argsStr string, prompt *mcp.Prompt) (map[string]string, error) {
 	args := make(map[string]string)
+
 	if argsStr != "" {
-		// Try to parse as JSON
 		var jsonArgs map[string]interface{}
 		if err := json.Unmarshal([]byte(argsStr), &jsonArgs); err != nil {
-			// If not valid JSON, provide help
-			fmt.Println("Error: Arguments must be valid JSON")
-			fmt.Printf("Example: prompt %s {\"arg1\": \"value1\", \"arg2\": \"value2\"}\n", promptName)
-
-			// Show required arguments
-			if len(prompt.Arguments) > 0 {
-				fmt.Println("Required arguments:")
-				for _, arg := range prompt.Arguments {
-					if arg.Required {
-						fmt.Printf("  - %s: %s\n", arg.Name, arg.Description)
-					}
-				}
-			}
-			return fmt.Errorf("invalid JSON arguments: %w", err)
+			showPromptArgumentHelp(prompt.Name, prompt.Arguments)
+			return nil, fmt.Errorf("invalid JSON arguments: %w", err)
 		}
 
-		// Convert to string map
 		for k, v := range jsonArgs {
 			args[k] = fmt.Sprintf("%v", v)
 		}
@@ -184,34 +225,44 @@ func (r *REPL) handleGetPrompt(ctx context.Context, promptName string, argsStr s
 	// Check required arguments
 	for _, arg := range prompt.Arguments {
 		if arg.Required && args[arg.Name] == "" {
-			return fmt.Errorf("missing required argument: %s", arg.Name)
+			return nil, fmt.Errorf("missing required argument: %s", arg.Name)
 		}
 	}
 
-	// Get the prompt
+	return args, nil
+}
+
+// displayPromptResult displays the result of a prompt retrieval
+func displayPromptResult(result *mcp.GetPromptResult) {
+	fmt.Println("Messages:")
+	for i, msg := range result.Messages {
+		fmt.Printf("\n[%d] Role: %s\n", i+1, msg.Role)
+		displayContent(msg.Content, "Content: ")
+	}
+}
+
+// handleGetPrompt retrieves and displays a prompt with arguments
+func (r *REPL) handleGetPrompt(ctx context.Context, promptName string, argsStr string) error {
+	if !r.client.ServerSupportsPrompts() {
+		return fmt.Errorf("server does not support prompts capability")
+	}
+
+	prompt := r.findPrompt(promptName)
+	if prompt == nil {
+		return fmt.Errorf("prompt not found: %s", promptName)
+	}
+
+	args, err := parsePromptArgs(argsStr, prompt)
+	if err != nil {
+		return err
+	}
+
 	fmt.Printf("Getting prompt: %s...\n", promptName)
 	result, err := r.client.GetPrompt(ctx, promptName, args)
 	if err != nil {
 		return fmt.Errorf("prompt retrieval failed: %w", err)
 	}
 
-	// Display messages
-	fmt.Println("Messages:")
-	for i, msg := range result.Messages {
-		fmt.Printf("\n[%d] Role: %s\n", i+1, msg.Role)
-		if textContent, ok := mcp.AsTextContent(msg.Content); ok {
-			fmt.Printf("Content: %s\n", textContent.Text)
-		} else if imageContent, ok := mcp.AsImageContent(msg.Content); ok {
-			fmt.Printf("Content: [Image: MIME type %s, %d bytes]\n", imageContent.MIMEType, len(imageContent.Data))
-		} else if audioContent, ok := mcp.AsAudioContent(msg.Content); ok {
-			fmt.Printf("Content: [Audio: MIME type %s, %d bytes]\n", audioContent.MIMEType, len(audioContent.Data))
-		} else if resource, ok := mcp.AsEmbeddedResource(msg.Content); ok {
-			fmt.Printf("Content: [Embedded Resource: %v]\n", resource.Resource)
-		} else {
-			// Fallback for unknown content types
-			fmt.Printf("Content: %+v\n", msg.Content)
-		}
-	}
-
+	displayPromptResult(result)
 	return nil
 }

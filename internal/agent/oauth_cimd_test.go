@@ -9,6 +9,9 @@ import (
 	"testing"
 )
 
+// testClientMetadataURL is a test CIMD URL used across multiple tests
+const testClientMetadataURL = "https://app.example.com/oauth/client-metadata.json"
+
 // TestValidateClientIDURL tests client_id URL validation per CIMD spec
 func TestValidateClientIDURL(t *testing.T) {
 	tests := []struct {
@@ -19,7 +22,7 @@ func TestValidateClientIDURL(t *testing.T) {
 	}{
 		{
 			name:      "valid HTTPS URL with path",
-			clientURL: "https://app.example.com/oauth/client-metadata.json",
+			clientURL: testClientMetadataURL,
 			wantErr:   false,
 		},
 		{
@@ -105,13 +108,13 @@ func TestGenerateClientMetadata(t *testing.T) {
 		{
 			name: "valid configuration",
 			config: &OAuthConfig{
-				ClientIDMetadataURL: "https://app.example.com/oauth/client-metadata.json",
+				ClientIDMetadataURL: testClientMetadataURL,
 				RedirectURL:         "http://localhost:8765/callback",
 			},
 			wantErr: false,
 			checkFunc: func(t *testing.T, doc *ClientMetadataDocument) {
-				if doc.ClientID != "https://app.example.com/oauth/client-metadata.json" {
-					t.Errorf("ClientID = %v, want %v", doc.ClientID, "https://app.example.com/oauth/client-metadata.json")
+				if doc.ClientID != testClientMetadataURL {
+					t.Errorf("ClientID = %v, want %v", doc.ClientID, testClientMetadataURL)
 				}
 				if doc.ClientName != "mcp-debug" {
 					t.Errorf("ClientName = %v, want mcp-debug", doc.ClientName)
@@ -194,7 +197,7 @@ func TestValidateClientMetadata(t *testing.T) {
 		{
 			name: "valid metadata",
 			metadata: &ClientMetadataDocument{
-				ClientID:                "https://app.example.com/oauth/client-metadata.json",
+				ClientID:                testClientMetadataURL,
 				ClientName:              "mcp-debug",
 				RedirectURIs:            []string{"http://localhost:8765/callback"},
 				GrantTypes:              []string{"authorization_code"},
@@ -206,7 +209,7 @@ func TestValidateClientMetadata(t *testing.T) {
 		{
 			name: "valid metadata with multiple redirect URIs",
 			metadata: &ClientMetadataDocument{
-				ClientID: "https://app.example.com/oauth/client-metadata.json",
+				ClientID: testClientMetadataURL,
 				RedirectURIs: []string{
 					"http://localhost:8765/callback",
 					"http://127.0.0.1:8765/callback",
@@ -239,7 +242,7 @@ func TestValidateClientMetadata(t *testing.T) {
 		{
 			name: "missing redirect_uris",
 			metadata: &ClientMetadataDocument{
-				ClientID:     "https://app.example.com/oauth/client-metadata.json",
+				ClientID:     testClientMetadataURL,
 				RedirectURIs: []string{},
 			},
 			wantErr: true,
@@ -248,7 +251,7 @@ func TestValidateClientMetadata(t *testing.T) {
 		{
 			name: "invalid redirect_uri scheme",
 			metadata: &ClientMetadataDocument{
-				ClientID:     "https://app.example.com/oauth/client-metadata.json",
+				ClientID:     testClientMetadataURL,
 				RedirectURIs: []string{"ftp://localhost/callback"},
 			},
 			wantErr: true,
@@ -257,7 +260,7 @@ func TestValidateClientMetadata(t *testing.T) {
 		{
 			name: "relative redirect_uri",
 			metadata: &ClientMetadataDocument{
-				ClientID:     "https://app.example.com/oauth/client-metadata.json",
+				ClientID:     testClientMetadataURL,
 				RedirectURIs: []string{"/callback"},
 			},
 			wantErr: true,
@@ -266,7 +269,7 @@ func TestValidateClientMetadata(t *testing.T) {
 		{
 			name: "HTTP redirect_uri with non-localhost host (security issue)",
 			metadata: &ClientMetadataDocument{
-				ClientID:     "https://app.example.com/oauth/client-metadata.json",
+				ClientID:     testClientMetadataURL,
 				RedirectURIs: []string{"http://example.com/callback"},
 			},
 			wantErr: true,
@@ -275,7 +278,7 @@ func TestValidateClientMetadata(t *testing.T) {
 		{
 			name: "HTTP redirect_uri with public IP (security issue)",
 			metadata: &ClientMetadataDocument{
-				ClientID:     "https://app.example.com/oauth/client-metadata.json",
+				ClientID:     testClientMetadataURL,
 				RedirectURIs: []string{"http://192.168.1.1:8080/callback"},
 			},
 			wantErr: true,
@@ -284,7 +287,7 @@ func TestValidateClientMetadata(t *testing.T) {
 		{
 			name: "valid HTTP localhost with IPv6",
 			metadata: &ClientMetadataDocument{
-				ClientID:     "https://app.example.com/oauth/client-metadata.json",
+				ClientID:     testClientMetadataURL,
 				RedirectURIs: []string{"http://[::1]:8765/callback"},
 			},
 			wantErr: false,
@@ -292,7 +295,7 @@ func TestValidateClientMetadata(t *testing.T) {
 		{
 			name: "valid HTTP 127.0.0.1",
 			metadata: &ClientMetadataDocument{
-				ClientID:     "https://app.example.com/oauth/client-metadata.json",
+				ClientID:     testClientMetadataURL,
 				RedirectURIs: []string{"http://127.0.0.1:8765/callback"},
 			},
 			wantErr: false,
@@ -300,7 +303,7 @@ func TestValidateClientMetadata(t *testing.T) {
 		{
 			name: "valid HTTPS with any host",
 			metadata: &ClientMetadataDocument{
-				ClientID:     "https://app.example.com/oauth/client-metadata.json",
+				ClientID:     testClientMetadataURL,
 				RedirectURIs: []string{"https://example.com/callback"},
 			},
 			wantErr: false,
@@ -341,8 +344,8 @@ func TestFetchClientMetadata(t *testing.T) {
 						t.Errorf("Expected GET request, got %s", r.Method)
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(&ClientMetadataDocument{
-						ClientID:                "https://app.example.com/oauth/client-metadata.json",
+					_ = json.NewEncoder(w).Encode(&ClientMetadataDocument{
+						ClientID:                testClientMetadataURL,
 						ClientName:              "mcp-debug",
 						RedirectURIs:            []string{"http://localhost:8765/callback"},
 						GrantTypes:              []string{"authorization_code"},
@@ -353,7 +356,7 @@ func TestFetchClientMetadata(t *testing.T) {
 			},
 			wantErr: false,
 			checkFunc: func(t *testing.T, doc *ClientMetadataDocument) {
-				if doc.ClientID != "https://app.example.com/oauth/client-metadata.json" {
+				if doc.ClientID != testClientMetadataURL {
 					t.Errorf("ClientID = %v, want https://app.example.com/oauth/client-metadata.json", doc.ClientID)
 				}
 				if doc.ClientName != "mcp-debug" {
@@ -376,7 +379,7 @@ func TestFetchClientMetadata(t *testing.T) {
 			setupMock: func() *httptest.Server {
 				return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
-					w.Write([]byte("invalid json"))
+					_, _ = w.Write([]byte("invalid json"))
 				}))
 			},
 			wantErr: true,
@@ -388,8 +391,8 @@ func TestFetchClientMetadata(t *testing.T) {
 				return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
 					// Missing redirect_uris
-					json.NewEncoder(w).Encode(&ClientMetadataDocument{
-						ClientID: "https://app.example.com/oauth/client-metadata.json",
+					_ = json.NewEncoder(w).Encode(&ClientMetadataDocument{
+						ClientID: testClientMetadataURL,
 					})
 				}))
 			},
@@ -401,7 +404,7 @@ func TestFetchClientMetadata(t *testing.T) {
 			setupMock: func() *httptest.Server {
 				return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "text/html")
-					w.Write([]byte("<html></html>"))
+					_, _ = w.Write([]byte("<html></html>"))
 				}))
 			},
 			wantErr: true,
@@ -504,7 +507,7 @@ func TestValidateCIMDConsistency(t *testing.T) {
 				return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
 					// The client_id in the document will match the URL (set in test)
-					json.NewEncoder(w).Encode(&ClientMetadataDocument{
+					_ = json.NewEncoder(w).Encode(&ClientMetadataDocument{
 						ClientID:     serverURL + "/client.json",
 						ClientName:   "Test Client",
 						RedirectURIs: []string{"http://localhost:8765/callback"},
@@ -519,7 +522,7 @@ func TestValidateCIMDConsistency(t *testing.T) {
 				return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
 					// client_id does NOT match the URL
-					json.NewEncoder(w).Encode(&ClientMetadataDocument{
+					_ = json.NewEncoder(w).Encode(&ClientMetadataDocument{
 						ClientID:     "https://other-domain.com/client.json",
 						ClientName:   "Test Client",
 						RedirectURIs: []string{"http://localhost:8765/callback"},
@@ -544,7 +547,7 @@ func TestValidateCIMDConsistency(t *testing.T) {
 			setupMock: func(_ string) *httptest.Server {
 				return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
-					w.Write([]byte("not valid json"))
+					_, _ = w.Write([]byte("not valid json"))
 				}))
 			},
 			wantErr: true,
@@ -566,7 +569,7 @@ func TestValidateCIMDConsistency(t *testing.T) {
 					w.Header().Set("Content-Type", "application/json")
 					// Build the expected client_id from the request
 					clientID := "https://" + r.Host + "/client.json"
-					json.NewEncoder(w).Encode(&ClientMetadataDocument{
+					_ = json.NewEncoder(w).Encode(&ClientMetadataDocument{
 						ClientID:     clientID,
 						ClientName:   "Test Client",
 						RedirectURIs: []string{"http://localhost:8765/callback"},
@@ -609,7 +612,7 @@ func TestOAuthConfigValidation_CIMD(t *testing.T) {
 			name: "valid CIMD config",
 			config: &OAuthConfig{
 				Enabled:             true,
-				ClientIDMetadataURL: "https://app.example.com/oauth/client-metadata.json",
+				ClientIDMetadataURL: testClientMetadataURL,
 				RedirectURL:         "http://localhost:8765/callback",
 			},
 			wantErr: false,
@@ -639,7 +642,7 @@ func TestOAuthConfigValidation_CIMD(t *testing.T) {
 			config: &OAuthConfig{
 				Enabled:             true,
 				DisableCIMD:         true,
-				ClientIDMetadataURL: "https://app.example.com/oauth/client-metadata.json",
+				ClientIDMetadataURL: testClientMetadataURL,
 				RedirectURL:         "http://localhost:8765/callback",
 			},
 			wantErr: false, // DisableCIMD means URL will be ignored, so validation passes

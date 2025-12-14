@@ -9,8 +9,11 @@ import (
 	"testing"
 )
 
+// testRegistrationToken is a test registration token used across multiple tests
+const testRegistrationToken = "test-registration-token-12345"
+
 func TestRegistrationTokenRoundTripper(t *testing.T) {
-	testToken := "test-registration-token-12345"
+	testToken := testRegistrationToken
 
 	tests := []struct {
 		name              string
@@ -209,7 +212,7 @@ func TestRegistrationTokenRoundTripper_RequestCloning(t *testing.T) {
 
 // TestRegistrationTokenRoundTripper_HTTPSEnforcement tests that tokens are only sent over HTTPS
 func TestRegistrationTokenRoundTripper_HTTPSEnforcement(t *testing.T) {
-	testToken := "test-registration-token-12345"
+	testToken := testRegistrationToken
 
 	// Create an HTTP (not HTTPS) test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -244,7 +247,7 @@ func TestRegistrationTokenRoundTripper_HTTPSEnforcement(t *testing.T) {
 
 // TestRegistrationTokenRoundTripper_HeaderConflict tests that existing Authorization headers are not overwritten
 func TestRegistrationTokenRoundTripper_HeaderConflict(t *testing.T) {
-	testToken := "test-registration-token-12345"
+	testToken := testRegistrationToken
 
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("Request should not have reached the server due to header conflict")
@@ -322,7 +325,7 @@ func TestIsRegistrationEndpoint(t *testing.T) {
 
 // TestRegistrationTokenRoundTripper_NonRegistrationEndpoints tests that tokens are NOT injected to non-registration endpoints
 func TestRegistrationTokenRoundTripper_NonRegistrationEndpoints(t *testing.T) {
-	testToken := "test-registration-token-12345"
+	testToken := testRegistrationToken
 
 	nonRegistrationPaths := []string{
 		"/oauth/token",

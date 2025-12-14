@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"mcp-debug/internal/agent"
 	"os"
@@ -11,6 +12,11 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+)
+
+const (
+	// transportStreamableHTTP is the only supported transport protocol
+	transportStreamableHTTP = "streamable-http"
 )
 
 var (
@@ -104,7 +110,7 @@ func SetVersion(v string) {
 func init() {
 	// Add flags
 	rootCmd.Flags().StringVar(&endpoint, "endpoint", "http://localhost:8090/mcp", "MCP endpoint URL (must end with /mcp)")
-	rootCmd.Flags().StringVar(&transport, "transport", "streamable-http", "Transport protocol to use for client connections (streamable-http only)")
+	rootCmd.Flags().StringVar(&transport, "transport", transportStreamableHTTP, "Transport protocol to use for client connections (streamable-http only)")
 	rootCmd.Flags().StringVar(&serverTransport, "server-transport", "stdio", "Transport protocol for the MCP server itself (stdio, streamable-http)")
 	rootCmd.Flags().StringVar(&listenAddr, "listen-addr", ":8899", "Listen address for streamable-http server (path is fixed to /mcp)")
 	rootCmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Timeout for waiting for notifications")
@@ -142,81 +148,134 @@ func init() {
 	rootCmd.MarkFlagsMutuallyExclusive("repl", "mcp-server")
 }
 
-func runMCPDebug(cmd *cobra.Command, args []string) error {
-	// Validate endpoint for streamable-http
-	if transport == "streamable-http" && !strings.HasSuffix(endpoint, "/mcp") {
+// validateTransport validates the transport configuration
+func validateTransport() error {
+	if transport == transportStreamableHTTP && !strings.HasSuffix(endpoint, "/mcp") {
 		return fmt.Errorf("endpoint '%s' must end with /mcp for streamable-http transport", endpoint)
 	}
-
-	if transport != "streamable-http" {
+	if transport != transportStreamableHTTP {
 		return fmt.Errorf("unsupported transport '%s' (only streamable-http is supported)", transport)
 	}
+	return nil
+}
 
-	// Create context with signal handling
-	ctx, cancel := context.WithCancel(cmd.Context())
-	defer cancel()
-
-	// Handle interrupts gracefully
+// setupSignalHandler sets up graceful shutdown on interrupt signals.
+// The silent parameter controls whether to suppress the shutdown message.
+func setupSignalHandler(cancel context.CancelFunc, silent bool) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-sigChan
-		if !mcpServer {
+		if !silent {
 			fmt.Println("\nReceived interrupt signal, shutting down gracefully...")
 		}
 		cancel()
 	}()
+}
 
-	// Create logger
-	logger := agent.NewLogger(verbose, !noColor, jsonRPC)
-
-	// Create OAuth config if enabled
-	var oauthConfig *agent.OAuthConfig
-	if oauthEnabled {
-		// Security warning: Check if client secret was passed via CLI flag
-		if oauthClientSecret != "" && cmd.Flags().Changed("oauth-client-secret") {
-			logger.Warning("⚠️  Security Warning: Client secret passed via CLI flag is visible in process listings")
-			logger.Info("Consider using environment variables instead: export OAUTH_CLIENT_SECRET=\"...\"")
-		}
-
-		oauthConfig = &agent.OAuthConfig{
-			Enabled:              true,
-			ClientID:             oauthClientID,
-			ClientSecret:         oauthClientSecret,
-			Scopes:               oauthScopes,
-			ScopeSelectionMode:   oauthScopeMode,
-			RedirectURL:          oauthRedirectURL,
-			UsePKCE:              oauthUsePKCE,
-			AuthorizationTimeout: oauthTimeout,
-			UseOIDC:              oauthUseOIDC,
-			RegistrationToken:    oauthRegistrationToken,
-			ResourceURI:          oauthResourceURI,
-			SkipResourceParam:    oauthSkipResource,
-			SkipResourceMetadata: oauthSkipResourceMeta,
-			PreferredAuthServer:  oauthPreferredAuthSrv,
-			EnableStepUpAuth:     !oauthDisableStepUp,
-			StepUpMaxRetries:     oauthStepUpMaxRetries,
-			StepUpUserPrompt:     oauthStepUpPrompt,
-			ClientIDMetadataURL:  oauthClientIDMetaURL,
-			DisableCIMD:          oauthDisableCIMD,
-		}
-
-		// Apply defaults for any unset fields
-		oauthConfig = oauthConfig.WithDefaults()
-
-		// Validate OAuth configuration
-		if err := oauthConfig.Validate(); err != nil {
-			return fmt.Errorf("invalid OAuth configuration: %w", err)
-		}
-
-		if oauthClientID == "" {
-			logger.Info("OAuth enabled - will attempt Dynamic Client Registration")
-		} else {
-			logger.Info("OAuth enabled with client ID: %s", oauthClientID)
-		}
+// buildOAuthConfig creates an OAuth configuration from CLI flags
+func buildOAuthConfig(cmd *cobra.Command, logger *agent.Logger) (*agent.OAuthConfig, error) {
+	if !oauthEnabled {
+		return nil, nil
 	}
 
-	// Create and run agent client
+	// Security warning: Check if client secret was passed via CLI flag
+	if oauthClientSecret != "" && cmd.Flags().Changed("oauth-client-secret") {
+		logger.Warning("Security Warning: Client secret passed via CLI flag is visible in process listings")
+		logger.Info("Consider using environment variables instead: export OAUTH_CLIENT_SECRET=\"...\"")
+	}
+
+	config := &agent.OAuthConfig{
+		Enabled:              true,
+		ClientID:             oauthClientID,
+		ClientSecret:         oauthClientSecret,
+		Scopes:               oauthScopes,
+		ScopeSelectionMode:   oauthScopeMode,
+		RedirectURL:          oauthRedirectURL,
+		UsePKCE:              oauthUsePKCE,
+		AuthorizationTimeout: oauthTimeout,
+		UseOIDC:              oauthUseOIDC,
+		RegistrationToken:    oauthRegistrationToken,
+		ResourceURI:          oauthResourceURI,
+		SkipResourceParam:    oauthSkipResource,
+		SkipResourceMetadata: oauthSkipResourceMeta,
+		PreferredAuthServer:  oauthPreferredAuthSrv,
+		EnableStepUpAuth:     !oauthDisableStepUp,
+		StepUpMaxRetries:     oauthStepUpMaxRetries,
+		StepUpUserPrompt:     oauthStepUpPrompt,
+		ClientIDMetadataURL:  oauthClientIDMetaURL,
+		DisableCIMD:          oauthDisableCIMD,
+	}
+
+	config = config.WithDefaults()
+
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid OAuth configuration: %w", err)
+	}
+
+	if oauthClientID == "" {
+		logger.Info("OAuth enabled - will attempt Dynamic Client Registration")
+	} else {
+		logger.Info("OAuth enabled with client ID: %s", oauthClientID)
+	}
+
+	return config, nil
+}
+
+// runMCPServer runs the agent in MCP server mode
+func runMCPServer(ctx context.Context, client *agent.Client, logger *agent.Logger) error {
+	server, err := agent.NewMCPServer(client, serverTransport, logger, false)
+	if err != nil {
+		return fmt.Errorf("failed to create MCP server: %w", err)
+	}
+
+	logger.Info("Starting mcp-debug MCP server (transport: %s)...", serverTransport)
+	if serverTransport == transportStreamableHTTP {
+		addr := listenAddr
+		if !strings.Contains(addr, ":") {
+			addr = ":" + addr
+		}
+		logger.Info("Listening on %s%s", addr, "/mcp")
+	}
+
+	if err := server.Start(ctx, listenAddr); err != nil {
+		return fmt.Errorf("MCP server error: %w", err)
+	}
+	return nil
+}
+
+// runNormalMode runs the agent in normal (listen) mode
+func runNormalMode(ctx context.Context, client *agent.Client, logger *agent.Logger) error {
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, timeout)
+	defer timeoutCancel()
+
+	if err := client.Listen(timeoutCtx); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			logger.Info("Timeout reached after %v", timeout)
+			return nil
+		}
+		return fmt.Errorf("agent error: %w", err)
+	}
+	return nil
+}
+
+func runMCPDebug(cmd *cobra.Command, args []string) error {
+	if err := validateTransport(); err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithCancel(cmd.Context())
+	defer cancel()
+
+	setupSignalHandler(cancel, mcpServer)
+
+	logger := agent.NewLogger(verbose, !noColor, jsonRPC)
+
+	oauthConfig, err := buildOAuthConfig(cmd, logger)
+	if err != nil {
+		return err
+	}
+
 	client := agent.NewClient(agent.ClientConfig{
 		Endpoint:    endpoint,
 		Transport:   transport,
@@ -228,31 +287,11 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to connect client: %w", err)
 	}
 
-	// Run in MCP Server mode if requested
 	if mcpServer {
-		server, err := agent.NewMCPServer(client, serverTransport, logger, false)
-		if err != nil {
-			return fmt.Errorf("failed to create MCP server: %w", err)
-		}
-
-		logger.Info("Starting mcp-debug MCP server (transport: %s)...", serverTransport)
-		if serverTransport == "streamable-http" {
-			addr := listenAddr
-			if !strings.Contains(addr, ":") {
-				addr = ":" + addr
-			}
-			logger.Info("Listening on %s%s", addr, "/mcp")
-		}
-
-		if err := server.Start(ctx, listenAddr); err != nil {
-			return fmt.Errorf("MCP server error: %w", err)
-		}
-		return nil
+		return runMCPServer(ctx, client, logger)
 	}
 
-	// Run in REPL mode if requested
 	if repl {
-		// REPL mode doesn't use timeout
 		replHandler := agent.NewREPL(client, logger)
 		if err := replHandler.Run(ctx); err != nil {
 			return fmt.Errorf("REPL error: %w", err)
@@ -260,18 +299,5 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Create timeout context for non-REPL mode
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, timeout)
-	defer timeoutCancel()
-
-	// Run the agent in normal mode
-	if err := client.Listen(timeoutCtx); err != nil {
-		if err == context.DeadlineExceeded {
-			logger.Info("Timeout reached after %v", timeout)
-			return nil
-		}
-		return fmt.Errorf("agent error: %w", err)
-	}
-
-	return nil
+	return runNormalMode(ctx, client, logger)
 }

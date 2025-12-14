@@ -120,7 +120,7 @@ func ValidateClientIDURL(clientIDURL string) error {
 
 	// MUST use https scheme (per spec Section 2)
 	// Note: HTTP is explicitly not allowed even for localhost
-	if parsed.Scheme != "https" {
+	if parsed.Scheme != schemeHTTPS {
 		return fmt.Errorf("client_id URL must use https scheme, got: %s", parsed.Scheme)
 	}
 
@@ -182,7 +182,7 @@ func fetchClientMetadataWithClient(ctx context.Context, clientIDURL string, http
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check response status
 	if resp.StatusCode != http.StatusOK {
@@ -247,18 +247,18 @@ func ValidateClientMetadata(metadata *ClientMetadataDocument) error {
 
 		// Security: Only allow HTTP for localhost/loopback addresses
 		// HTTPS is allowed for any host (per spec Section 6: Security Considerations)
-		if parsed.Scheme == "http" {
+		if parsed.Scheme == schemeHTTP {
 			hostname := parsed.Hostname()
 			// Note: Hostname() strips brackets from IPv6 addresses, so [::1] becomes ::1
 			// Accept various forms of localhost: localhost, 127.0.0.1, ::1, and expanded IPv6 0:0:0:0:0:0:0:1
-			isLocalhost := hostname == "localhost" ||
-				hostname == "127.0.0.1" ||
+			isLocalhost := hostname == hostLocal ||
+				hostname == hostLoopback ||
 				hostname == "::1" ||
 				hostname == "0:0:0:0:0:0:0:1"
 			if !isLocalhost {
 				return fmt.Errorf("redirect_uri at index %d: HTTP scheme only allowed for localhost/127.0.0.1/[::1], got %s", i, hostname)
 			}
-		} else if parsed.Scheme != "https" {
+		} else if parsed.Scheme != schemeHTTPS {
 			return fmt.Errorf("redirect_uri at index %d must use http or https scheme: %s", i, uri)
 		}
 	}

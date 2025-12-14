@@ -41,9 +41,9 @@ func (c *Client) handleMCPOAuthFlow(ctx context.Context, oauthHandler *transport
 		c.logger.Info("No client ID configured, attempting dynamic client registration...")
 
 		// Use semantic version in client name
-		clientName := "mcp-debug"
+		clientName := DefaultClientName
 		if c.version != "" && c.version != "dev" {
-			clientName = fmt.Sprintf("mcp-debug/%s", c.version)
+			clientName = fmt.Sprintf("%s/%s", DefaultClientName, c.version)
 		}
 
 		err := oauthHandler.RegisterClient(ctx, clientName)
@@ -282,7 +282,7 @@ func validateBrowserURL(urlStr string) error {
 		return fmt.Errorf("invalid URL: %w", err)
 	}
 
-	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+	if parsedURL.Scheme != schemeHTTP && parsedURL.Scheme != schemeHTTPS {
 		return fmt.Errorf("invalid URL scheme for browser: %s (only http/https allowed)", parsedURL.Scheme)
 	}
 

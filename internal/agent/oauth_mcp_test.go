@@ -316,7 +316,7 @@ func TestCallbackServerErrorHandling(t *testing.T) {
 		errorURL := fmt.Sprintf("%s?error=access_denied&error_description=%s",
 			redirectURL, url.QueryEscape("User denied access"))
 
-		resp, err := http.Get(errorURL)
+		resp, err := http.Get(errorURL) //nolint:gosec // URL is constructed from test server
 		if err != nil {
 			t.Fatalf("Failed to make callback request: %v", err)
 		}

@@ -11,6 +11,18 @@ import (
 // the authorization server supports Client ID Metadata Documents (CIMD).
 const DefaultClientIDMetadataURL = "https://giantswarm.github.io/mcp-debug/client.json"
 
+// OAuth configuration constants
+const (
+	// ScopeModeManual indicates manual scope selection
+	ScopeModeManual = "manual"
+	// ScopeModeAuto indicates automatic scope selection per MCP spec
+	ScopeModeAuto = "auto"
+	// DefaultRedirectURL is the default OAuth callback URL
+	DefaultRedirectURL = "http://localhost:8765/callback"
+	// DefaultClientName is the default OAuth client name
+	DefaultClientName = "mcp-debug"
+)
+
 // OAuthConfig contains OAuth 2.1 configuration for authenticating with MCP servers
 type OAuthConfig struct {
 	// Enabled indicates whether OAuth authentication should be used
@@ -127,8 +139,8 @@ func DefaultOAuthConfig() *OAuthConfig {
 	return &OAuthConfig{
 		Enabled:              false,
 		Scopes:               []string{},
-		ScopeSelectionMode:   "auto", // Secure by default: follow MCP spec
-		RedirectURL:          "http://localhost:8765/callback",
+		ScopeSelectionMode:   ScopeModeAuto, // Secure by default: follow MCP spec
+		RedirectURL:          DefaultRedirectURL,
 		UsePKCE:              true,
 		AuthorizationTimeout: 5 * time.Minute,
 		UseOIDC:              false, // OIDC features disabled by default
@@ -149,12 +161,12 @@ func (c *OAuthConfig) WithDefaults() *OAuthConfig {
 
 	// Set default redirect URL if not provided
 	if config.RedirectURL == "" {
-		config.RedirectURL = "http://localhost:8765/callback"
+		config.RedirectURL = DefaultRedirectURL
 	}
 
 	// Set default scope selection mode if not provided
 	if config.ScopeSelectionMode == "" {
-		config.ScopeSelectionMode = "auto"
+		config.ScopeSelectionMode = ScopeModeAuto
 	}
 
 	// Set default step-up max retries if not provided
@@ -174,7 +186,7 @@ func (c *OAuthConfig) Validate() error {
 	}
 
 	// Validate scope selection mode
-	if c.ScopeSelectionMode != "" && c.ScopeSelectionMode != "auto" && c.ScopeSelectionMode != "manual" {
+	if c.ScopeSelectionMode != "" && c.ScopeSelectionMode != ScopeModeAuto && c.ScopeSelectionMode != ScopeModeManual {
 		return fmt.Errorf("invalid scope selection mode: %s (must be 'auto' or 'manual')", c.ScopeSelectionMode)
 	}
 

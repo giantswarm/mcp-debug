@@ -145,7 +145,7 @@ func (c *Client) connectAndInitialize(ctx context.Context) error {
 		selectedScopes := selectScopes(c.oauthConfig, nil, discoveredMetadata, c.logger)
 
 		// Log scope selection for security audit
-		if c.oauthConfig.ScopeSelectionMode == "manual" {
+		if c.oauthConfig.ScopeSelectionMode == ScopeModeManual {
 			c.logger.Info("Scope selection mode: manual")
 			c.logger.Info("Requested scopes (manual): %v", selectedScopes)
 		} else {
@@ -490,17 +490,17 @@ func (c *Client) handleNotification(ctx context.Context, notification mcp.JSONRP
 
 	// Handle specific notifications only if the server supports the corresponding capability
 	switch notification.Method {
-	case "notifications/tools/list_changed":
+	case notificationToolsListChanged:
 		if c.ServerSupportsTools() {
 			return c.listTools(ctx, false)
 		}
 
-	case "notifications/resources/list_changed":
+	case notificationResourcesListChanged:
 		if c.ServerSupportsResources() {
 			return c.listResources(ctx, false)
 		}
 
-	case "notifications/prompts/list_changed":
+	case notificationPromptsListChanged:
 		if c.ServerSupportsPrompts() {
 			return c.listPrompts(ctx, false)
 		}

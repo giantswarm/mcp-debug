@@ -172,11 +172,11 @@ func buildASMetadataEndpoints(issuerURL string) ([]string, error) {
 	}
 
 	// Validate scheme: HTTPS required, HTTP only allowed for localhost
-	if parsed.Scheme == "http" {
+	if parsed.Scheme == schemeHTTP {
 		if !isLocalhost(parsed.Host) {
 			return nil, fmt.Errorf("issuer URL must use https scheme (http only allowed for localhost, got: %s)", parsed.Host)
 		}
-	} else if parsed.Scheme != "https" {
+	} else if parsed.Scheme != schemeHTTPS {
 		return nil, fmt.Errorf("issuer URL must use http or https scheme")
 	}
 
@@ -361,7 +361,7 @@ func ValidatePKCESupport(metadata *AuthorizationServerMetadata, skipValidation b
 	// Check for S256 support (MUST use S256 when capable per OAuth 2.1)
 	hasS256 := false
 	for _, method := range metadata.CodeChallengeMethods {
-		if method == "S256" {
+		if method == pkceMethodS256 {
 			hasS256 = true
 			break
 		}

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,22 +13,28 @@ import (
 	"github.com/chzyer/readline"
 )
 
+// errExit is a sentinel error used to signal REPL exit
+var errExit = errors.New("exit")
+
 // REPL represents the Read-Eval-Print Loop for MCP interaction
 type REPL struct {
-	client   *Client
-	logger   *Logger
-	rl       *readline.Instance
-	stopChan chan struct{}
-	wg       sync.WaitGroup
+	client          *Client
+	logger          *Logger
+	rl              *readline.Instance
+	stopChan        chan struct{}
+	wg              sync.WaitGroup
+	commandHandlers map[string]commandHandler
 }
 
 // NewREPL creates a new REPL instance
 func NewREPL(client *Client, logger *Logger) *REPL {
-	return &REPL{
+	r := &REPL{
 		client:   client,
 		logger:   logger,
 		stopChan: make(chan struct{}),
 	}
+	r.commandHandlers = r.buildCommandHandlers()
+	return r
 }
 
 // Run starts the REPL
@@ -96,7 +103,7 @@ func (r *REPL) Run(ctx context.Context) error {
 
 		// Parse and execute command
 		if err := r.executeCommand(ctx, input); err != nil {
-			if err.Error() == "exit" {
+			if errors.Is(err, errExit) {
 				close(r.stopChan)
 				r.wg.Wait()
 				r.logger.Info("Goodbye!")
@@ -109,78 +116,86 @@ func (r *REPL) Run(ctx context.Context) error {
 	}
 }
 
-// createCompleter creates the tab completion configuration
-func (r *REPL) createCompleter() *readline.PrefixCompleter {
-	// Get lists for completion
+// completerCache holds cached completion items for different capabilities
+type completerCache struct {
+	tools     []string
+	resources []string
+	prompts   []string
+}
+
+// getCompletionNames retrieves names for tab completion from the client cache
+func (r *REPL) getCompletionNames() completerCache {
 	r.client.mu.RLock()
-	var tools []string
-	var resources []string
-	var prompts []string
+	defer r.client.mu.RUnlock()
+
+	cache := completerCache{}
 
 	if r.client.ServerSupportsTools() {
-		tools = make([]string, len(r.client.toolCache))
+		cache.tools = make([]string, len(r.client.toolCache))
 		for i, tool := range r.client.toolCache {
-			tools[i] = tool.Name
+			cache.tools[i] = tool.Name
 		}
 	}
 
 	if r.client.ServerSupportsResources() {
-		resources = make([]string, len(r.client.resourceCache))
+		cache.resources = make([]string, len(r.client.resourceCache))
 		for i, resource := range r.client.resourceCache {
-			resources[i] = resource.URI
+			cache.resources[i] = resource.URI
 		}
 	}
 
 	if r.client.ServerSupportsPrompts() {
-		prompts = make([]string, len(r.client.promptCache))
+		cache.prompts = make([]string, len(r.client.promptCache))
 		for i, prompt := range r.client.promptCache {
-			prompts[i] = prompt.Name
+			cache.prompts[i] = prompt.Name
 		}
 	}
-	r.client.mu.RUnlock()
 
-	// Create dynamic completers for items
-	toolCompleter := make([]readline.PrefixCompleterInterface, len(tools))
-	for i, tool := range tools {
-		toolCompleter[i] = readline.PcItem(tool)
+	return cache
+}
+
+// buildPcItems converts a slice of strings to readline completer items
+func buildPcItems(names []string) []readline.PrefixCompleterInterface {
+	items := make([]readline.PrefixCompleterInterface, len(names))
+	for i, name := range names {
+		items[i] = readline.PcItem(name)
 	}
+	return items
+}
 
-	resourceCompleter := make([]readline.PrefixCompleterInterface, len(resources))
-	for i, resource := range resources {
-		resourceCompleter[i] = readline.PcItem(resource)
-	}
-
-	promptCompleter := make([]readline.PrefixCompleterInterface, len(prompts))
-	for i, prompt := range prompts {
-		promptCompleter[i] = readline.PcItem(prompt)
-	}
-
-	// Build list items based on supported capabilities
-	var listItems []readline.PrefixCompleterInterface
+// buildListItems creates list command completion items based on server capabilities
+func (r *REPL) buildListItems() []readline.PrefixCompleterInterface {
+	var items []readline.PrefixCompleterInterface
 	if r.client.ServerSupportsTools() {
-		listItems = append(listItems, readline.PcItem("tools"))
+		items = append(items, readline.PcItem("tools"))
 	}
 	if r.client.ServerSupportsResources() {
-		listItems = append(listItems, readline.PcItem("resources"))
+		items = append(items, readline.PcItem("resources"))
 	}
 	if r.client.ServerSupportsPrompts() {
-		listItems = append(listItems, readline.PcItem("prompts"))
+		items = append(items, readline.PcItem("prompts"))
 	}
+	return items
+}
 
-	// Build describe items based on supported capabilities
-	var describeItems []readline.PrefixCompleterInterface
+// buildDescribeItems creates describe command completion items
+func (r *REPL) buildDescribeItems(toolCompleter, resourceCompleter, promptCompleter []readline.PrefixCompleterInterface) []readline.PrefixCompleterInterface {
+	var items []readline.PrefixCompleterInterface
 	if r.client.ServerSupportsTools() {
-		describeItems = append(describeItems, readline.PcItem("tool", toolCompleter...))
+		items = append(items, readline.PcItem("tool", toolCompleter...))
 	}
 	if r.client.ServerSupportsResources() {
-		describeItems = append(describeItems, readline.PcItem("resource", resourceCompleter...))
+		items = append(items, readline.PcItem("resource", resourceCompleter...))
 	}
 	if r.client.ServerSupportsPrompts() {
-		describeItems = append(describeItems, readline.PcItem("prompt", promptCompleter...))
+		items = append(items, readline.PcItem("prompt", promptCompleter...))
 	}
+	return items
+}
 
-	// Build top-level items
-	items := []readline.PrefixCompleterInterface{
+// buildBaseCompleterItems creates the base command completion items
+func buildBaseCompleterItems() []readline.PrefixCompleterInterface {
+	return []readline.PrefixCompleterInterface{
 		readline.PcItem("help"),
 		readline.PcItem("?"),
 		readline.PcItem("exit"),
@@ -190,23 +205,33 @@ func (r *REPL) createCompleter() *readline.PrefixCompleter {
 			readline.PcItem("off"),
 		),
 	}
+}
+
+// createCompleter creates the tab completion configuration
+func (r *REPL) createCompleter() *readline.PrefixCompleter {
+	cache := r.getCompletionNames()
+
+	toolCompleter := buildPcItems(cache.tools)
+	resourceCompleter := buildPcItems(cache.resources)
+	promptCompleter := buildPcItems(cache.prompts)
+
+	listItems := r.buildListItems()
+	describeItems := r.buildDescribeItems(toolCompleter, resourceCompleter, promptCompleter)
+
+	items := buildBaseCompleterItems()
 
 	if len(listItems) > 0 {
 		items = append(items, readline.PcItem("list", listItems...))
 	}
-
 	if len(describeItems) > 0 {
 		items = append(items, readline.PcItem("describe", describeItems...))
 	}
-
 	if r.client.ServerSupportsTools() {
 		items = append(items, readline.PcItem("call", toolCompleter...))
 	}
-
 	if r.client.ServerSupportsResources() {
 		items = append(items, readline.PcItem("get", resourceCompleter...))
 	}
-
 	if r.client.ServerSupportsPrompts() {
 		items = append(items, readline.PcItem("prompt", promptCompleter...))
 	}
@@ -247,9 +272,9 @@ func (r *REPL) notificationListener(ctx context.Context) {
 
 			// Update completer if items changed
 			switch notification.Method {
-			case "notifications/tools/list_changed",
-				"notifications/resources/list_changed",
-				"notifications/prompts/list_changed":
+			case notificationToolsListChanged,
+				notificationResourcesListChanged,
+				notificationPromptsListChanged:
 				if r.rl != nil {
 					r.rl.Config.AutoComplete = r.createCompleter()
 				}
@@ -263,6 +288,73 @@ func (r *REPL) notificationListener(ctx context.Context) {
 	}
 }
 
+// commandHandler defines a REPL command with its handler and argument requirements
+type commandHandler struct {
+	minArgs int
+	usage   string
+	handler func(ctx context.Context, parts []string) error
+}
+
+// buildCommandHandlers creates the map of command handlers
+func (r *REPL) buildCommandHandlers() map[string]commandHandler {
+	return map[string]commandHandler{
+		"help": {minArgs: 1, handler: func(ctx context.Context, parts []string) error {
+			return r.showHelp()
+		}},
+		"?": {minArgs: 1, handler: func(ctx context.Context, parts []string) error {
+			return r.showHelp()
+		}},
+		"exit": {minArgs: 1, handler: func(ctx context.Context, parts []string) error {
+			return errExit
+		}},
+		"quit": {minArgs: 1, handler: func(ctx context.Context, parts []string) error {
+			return errExit
+		}},
+		"list": {
+			minArgs: 2,
+			usage:   "usage: list <tools|resources|prompts>",
+			handler: func(ctx context.Context, parts []string) error {
+				return r.handleList(ctx, parts[1])
+			},
+		},
+		"describe": {
+			minArgs: 3,
+			usage:   "usage: describe <tool|resource|prompt> <name>",
+			handler: func(ctx context.Context, parts []string) error {
+				return r.handleDescribe(ctx, parts[1], strings.Join(parts[2:], " "))
+			},
+		},
+		"notifications": {
+			minArgs: 2,
+			usage:   "usage: notifications <on|off>",
+			handler: func(ctx context.Context, parts []string) error {
+				return r.handleNotifications(parts[1])
+			},
+		},
+		"call": {
+			minArgs: 2,
+			usage:   "usage: call <tool-name> [args...]",
+			handler: func(ctx context.Context, parts []string) error {
+				return r.handleCallTool(ctx, parts[1], strings.Join(parts[2:], " "))
+			},
+		},
+		"get": {
+			minArgs: 2,
+			usage:   "usage: get <resource-uri>",
+			handler: func(ctx context.Context, parts []string) error {
+				return r.handleGetResource(ctx, parts[1])
+			},
+		},
+		"prompt": {
+			minArgs: 2,
+			usage:   "usage: prompt <prompt-name> [args...]",
+			handler: func(ctx context.Context, parts []string) error {
+				return r.handleGetPrompt(ctx, parts[1], strings.Join(parts[2:], " "))
+			},
+		},
+	}
+}
+
 // executeCommand parses and executes a command
 func (r *REPL) executeCommand(ctx context.Context, input string) error {
 	parts := strings.Fields(input)
@@ -272,52 +364,16 @@ func (r *REPL) executeCommand(ctx context.Context, input string) error {
 
 	command := strings.ToLower(parts[0])
 
-	switch command {
-	case "help", "?":
-		return r.showHelp()
-
-	case "list":
-		if len(parts) < 2 {
-			return fmt.Errorf("usage: list <tools|resources|prompts>")
-		}
-		return r.handleList(ctx, parts[1])
-
-	case "describe":
-		if len(parts) < 3 {
-			return fmt.Errorf("usage: describe <tool|resource|prompt> <name>")
-		}
-		return r.handleDescribe(ctx, parts[1], strings.Join(parts[2:], " "))
-
-	case "exit", "quit":
-		return fmt.Errorf("exit")
-
-	case "notifications":
-		if len(parts) < 2 {
-			return fmt.Errorf("usage: notifications <on|off>")
-		}
-		return r.handleNotifications(parts[1])
-
-	case "call":
-		if len(parts) < 2 {
-			return fmt.Errorf("usage: call <tool-name> [args...]")
-		}
-		return r.handleCallTool(ctx, parts[1], strings.Join(parts[2:], " "))
-
-	case "get":
-		if len(parts) < 2 {
-			return fmt.Errorf("usage: get <resource-uri>")
-		}
-		return r.handleGetResource(ctx, parts[1])
-
-	case "prompt":
-		if len(parts) < 2 {
-			return fmt.Errorf("usage: prompt <prompt-name> [args...]")
-		}
-		return r.handleGetPrompt(ctx, parts[1], strings.Join(parts[2:], " "))
-
-	default:
+	handler, exists := r.commandHandlers[command]
+	if !exists {
 		return fmt.Errorf("unknown command: %s. Type 'help' for available commands", command)
 	}
+
+	if len(parts) < handler.minArgs {
+		return errors.New(handler.usage)
+	}
+
+	return handler.handler(ctx, parts)
 }
 
 // showHelp displays available commands
