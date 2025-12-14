@@ -36,25 +36,30 @@ func parseToolArgs(argsStr string, toolName string) (map[string]interface{}, err
 	return args, nil
 }
 
-// displayToolResultContent displays a single content item from a tool result
-func displayToolResultContent(content mcp.Content) {
+// displayContent displays a single content item with an optional prefix.
+// Use empty string for no prefix, or "Content: " for prompt message display.
+func displayContent(content mcp.Content, prefix string) {
 	if textContent, ok := mcp.AsTextContent(content); ok {
-		displayTextContent(textContent.Text)
+		if prefix == "" {
+			displayTextContent(textContent.Text)
+		} else {
+			fmt.Printf("%s%s\n", prefix, textContent.Text)
+		}
 		return
 	}
 	if imageContent, ok := mcp.AsImageContent(content); ok {
-		fmt.Printf("[Image: MIME type %s, %d bytes]\n", imageContent.MIMEType, len(imageContent.Data))
+		fmt.Printf("%s[Image: MIME type %s, %d bytes]\n", prefix, imageContent.MIMEType, len(imageContent.Data))
 		return
 	}
 	if audioContent, ok := mcp.AsAudioContent(content); ok {
-		fmt.Printf("[Audio: MIME type %s, %d bytes]\n", audioContent.MIMEType, len(audioContent.Data))
+		fmt.Printf("%s[Audio: MIME type %s, %d bytes]\n", prefix, audioContent.MIMEType, len(audioContent.Data))
 		return
 	}
 	if resource, ok := mcp.AsEmbeddedResource(content); ok {
-		fmt.Printf("[Embedded Resource: %v]\n", resource.Resource)
+		fmt.Printf("%s[Embedded Resource: %v]\n", prefix, resource.Resource)
 		return
 	}
-	fmt.Printf("%+v\n", content)
+	fmt.Printf("%s%+v\n", prefix, content)
 }
 
 // displayTextContent displays text content, pretty-printing JSON if possible
@@ -81,7 +86,7 @@ func displayToolResult(result *mcp.CallToolResult) {
 
 	fmt.Println("Result:")
 	for _, content := range result.Content {
-		displayToolResultContent(content)
+		displayContent(content, "")
 	}
 }
 
@@ -220,33 +225,12 @@ func parsePromptArgs(argsStr string, prompt *mcp.Prompt) (map[string]string, err
 	return args, nil
 }
 
-// displayPromptMessageContent displays the content of a prompt message
-func displayPromptMessageContent(content mcp.Content) {
-	if textContent, ok := mcp.AsTextContent(content); ok {
-		fmt.Printf("Content: %s\n", textContent.Text)
-		return
-	}
-	if imageContent, ok := mcp.AsImageContent(content); ok {
-		fmt.Printf("Content: [Image: MIME type %s, %d bytes]\n", imageContent.MIMEType, len(imageContent.Data))
-		return
-	}
-	if audioContent, ok := mcp.AsAudioContent(content); ok {
-		fmt.Printf("Content: [Audio: MIME type %s, %d bytes]\n", audioContent.MIMEType, len(audioContent.Data))
-		return
-	}
-	if resource, ok := mcp.AsEmbeddedResource(content); ok {
-		fmt.Printf("Content: [Embedded Resource: %v]\n", resource.Resource)
-		return
-	}
-	fmt.Printf("Content: %+v\n", content)
-}
-
 // displayPromptResult displays the result of a prompt retrieval
 func displayPromptResult(result *mcp.GetPromptResult) {
 	fmt.Println("Messages:")
 	for i, msg := range result.Messages {
 		fmt.Printf("\n[%d] Role: %s\n", i+1, msg.Role)
-		displayPromptMessageContent(msg.Content)
+		displayContent(msg.Content, "Content: ")
 	}
 }
 

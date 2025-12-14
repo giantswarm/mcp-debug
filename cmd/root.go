@@ -159,13 +159,14 @@ func validateTransport() error {
 	return nil
 }
 
-// setupSignalHandler sets up graceful shutdown on interrupt signals
-func setupSignalHandler(cancel context.CancelFunc) {
+// setupSignalHandler sets up graceful shutdown on interrupt signals.
+// The silent parameter controls whether to suppress the shutdown message.
+func setupSignalHandler(cancel context.CancelFunc, silent bool) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-sigChan
-		if !mcpServer {
+		if !silent {
 			fmt.Println("\nReceived interrupt signal, shutting down gracefully...")
 		}
 		cancel()
@@ -266,7 +267,7 @@ func runMCPDebug(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
 
-	setupSignalHandler(cancel)
+	setupSignalHandler(cancel, mcpServer)
 
 	logger := agent.NewLogger(verbose, !noColor, jsonRPC)
 
