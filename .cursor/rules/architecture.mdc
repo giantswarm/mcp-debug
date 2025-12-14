@@ -1,6 +1,6 @@
 ---
 description: 
-globs: 
+globs: **/*
 alwaysApply: true
 ---
 # Architecture Principles
@@ -23,7 +23,7 @@ This document outlines the fundamental architectural principles and patterns for
     goimports -w .
     go fmt ./...
     ```
--   **Dependencies:** Before adding a new dependency with `go get`, use `web_search` to find its latest stable version.
+-   **Dependencies:** Before adding a new dependency with `go get`, search the web to find its latest stable version. This is a must!
 -   **Error Handling:** Wrap errors with `fmt.Errorf("context: %w", err)` to preserve context.
 -   **File Size:** Keep files focused and under **500 lines**. Refactor larger files.
 
