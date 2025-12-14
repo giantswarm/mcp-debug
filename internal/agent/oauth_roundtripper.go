@@ -67,7 +67,7 @@ func (rt *registrationTokenRoundTripper) RoundTrip(req *http.Request) (*http.Res
 		// Security: Only inject token over HTTPS to prevent credential exposure
 		// Per OAuth 2.0 Security Best Current Practice (BCP), sensitive credentials
 		// MUST only be transmitted over secure channels
-		if clonedReq.URL.Scheme != "https" {
+		if clonedReq.URL.Scheme != schemeHTTPS {
 			if rt.logger != nil {
 				rt.logger.Error("Security: Registration token can only be sent over HTTPS, got %s", clonedReq.URL.Scheme)
 			}

@@ -313,7 +313,7 @@ func validateProtectedResourceMetadata(metadata *ProtectedResourceMetadata) erro
 			return fmt.Errorf("authorization server URL at index %d must be absolute: %s", i, asURL)
 		}
 
-		if parsed.Scheme != "https" && parsed.Scheme != "http" {
+		if parsed.Scheme != schemeHTTPS && parsed.Scheme != schemeHTTP {
 			return fmt.Errorf("authorization server URL at index %d must use http or https scheme: %s", i, asURL)
 		}
 

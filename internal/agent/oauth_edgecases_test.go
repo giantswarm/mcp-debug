@@ -11,6 +11,9 @@ import (
 	"time"
 )
 
+// authSchemeBearer is the Bearer authentication scheme
+const authSchemeBearer = "Bearer"
+
 // TestResourceRoundTripperEdgeCases tests edge cases for resource parameter injection per RFC 8707
 // Verifies that resource indicators are correctly added to OAuth requests
 func TestResourceRoundTripperEdgeCases(t *testing.T) {
@@ -356,10 +359,10 @@ func TestParseWWWAuthenticateEdgeCases(t *testing.T) {
 		},
 		{
 			name:        "scheme only",
-			header:      "Bearer",
+			header:      authSchemeBearer,
 			expectError: false,
 			checkResult: func(t *testing.T, c *WWWAuthenticateChallenge) {
-				if c.Scheme != "Bearer" {
+				if c.Scheme != authSchemeBearer {
 					t.Errorf("Scheme = %s, want Bearer", c.Scheme)
 				}
 			},
@@ -370,7 +373,7 @@ func TestParseWWWAuthenticateEdgeCases(t *testing.T) {
 			expectError: false,
 			checkResult: func(t *testing.T, c *WWWAuthenticateChallenge) {
 				// Just verify it parses without error
-				if c.Scheme != "Bearer" {
+				if c.Scheme != authSchemeBearer {
 					t.Errorf("Scheme = %s, want Bearer", c.Scheme)
 				}
 			},
@@ -380,7 +383,7 @@ func TestParseWWWAuthenticateEdgeCases(t *testing.T) {
 			header:      `Bearer   key="value"  ,  key2="value2"`,
 			expectError: false,
 			checkResult: func(t *testing.T, c *WWWAuthenticateChallenge) {
-				if c.Scheme != "Bearer" {
+				if c.Scheme != authSchemeBearer {
 					t.Errorf("Scheme = %s, want Bearer", c.Scheme)
 				}
 			},

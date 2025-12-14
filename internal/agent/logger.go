@@ -18,6 +18,14 @@ const (
 	colorGray   = "\033[90m"
 )
 
+// MCP method constants
+const (
+	methodInitialize                 = "initialize"
+	notificationToolsListChanged     = "notifications/tools/list_changed"
+	notificationResourcesListChanged = "notifications/resources/list_changed"
+	notificationPromptsListChanged   = "notifications/prompts/list_changed"
+)
+
 // Logger provides formatted logging for the agent
 type Logger struct {
 	verbose     bool
@@ -121,7 +129,7 @@ func (l *Logger) Request(method string, params interface{}) {
 	if !l.jsonRPCMode {
 		// Simple mode - just log what we're doing
 		switch method {
-		case "initialize":
+		case methodInitialize:
 			l.Info("Initializing MCP session...")
 		case "tools/list":
 			l.Info("Listing available tools...")
@@ -154,7 +162,7 @@ func (l *Logger) Response(method string, result interface{}) {
 	if !l.jsonRPCMode {
 		// Simple mode - log meaningful information
 		switch method {
-		case "initialize":
+		case methodInitialize:
 			// Extract protocol version if possible
 			if initResult, ok := result.(map[string]interface{}); ok {
 				if protocolVersion, exists := initResult["protocolVersion"]; exists {
@@ -219,11 +227,11 @@ func (l *Logger) Notification(method string, params interface{}) {
 	if !l.jsonRPCMode {
 		// Simple mode - just log the notification type
 		switch method {
-		case "notifications/tools/list_changed":
+		case notificationToolsListChanged:
 			l.Info("Tools list changed! Fetching updated list...")
-		case "notifications/resources/list_changed":
+		case notificationResourcesListChanged:
 			l.Info("Resources list changed! Fetching updated list...")
-		case "notifications/prompts/list_changed":
+		case notificationPromptsListChanged:
 			l.Info("Prompts list changed! Fetching updated list...")
 		default:
 			if l.verbose {

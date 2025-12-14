@@ -13,7 +13,7 @@ package agent
 // only the scopes specified by the server or none at all.
 func selectScopes(config *OAuthConfig, challenge *WWWAuthenticateChallenge, metadata *ProtectedResourceMetadata, logger *Logger) []string {
 	// Manual mode: always use configured scopes
-	if config.ScopeSelectionMode == "manual" {
+	if config.ScopeSelectionMode == ScopeModeManual {
 		// Warn if manual scopes diverge from discovered scopes
 		if logger != nil {
 			var discoveredScopes []string

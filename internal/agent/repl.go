@@ -272,9 +272,9 @@ func (r *REPL) notificationListener(ctx context.Context) {
 
 			// Update completer if items changed
 			switch notification.Method {
-			case "notifications/tools/list_changed",
-				"notifications/resources/list_changed",
-				"notifications/prompts/list_changed":
+			case notificationToolsListChanged,
+				notificationResourcesListChanged,
+				notificationPromptsListChanged:
 				if r.rl != nil {
 					r.rl.Config.AutoComplete = r.createCompleter()
 				}

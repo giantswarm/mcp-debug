@@ -20,6 +20,9 @@ const (
 	testDelayLong     = 100 * time.Millisecond
 )
 
+// OAuth response type constant
+const responseTypeCode = "code"
+
 // testEnv encapsulates a complete test environment with mock servers
 type testEnv struct {
 	AS      *MockAuthServer
@@ -136,7 +139,7 @@ func NewMockAuthServer(t *testing.T) *MockAuthServer {
 	mux.HandleFunc("/register", mas.handleRegister)
 
 	mas.Server = httptest.NewServer(mux)
-	mas.issuerURL = mas.Server.URL
+	mas.issuerURL = mas.URL
 
 	return mas
 }
@@ -152,7 +155,7 @@ func (mas *MockAuthServer) handleASMetadata(w http.ResponseWriter, r *http.Reque
 		AuthorizationEndpoint:             mas.issuerURL + "/authorize",
 		TokenEndpoint:                     mas.issuerURL + "/token",
 		ScopesSupported:                   mas.scopesSupported,
-		ResponseTypesSupported:            []string{"code"},
+		ResponseTypesSupported:            []string{responseTypeCode},
 		GrantTypesSupported:               []string{"authorization_code", "refresh_token"},
 		CodeChallengeMethods:              mas.codeChallengeMethods,
 		ClientIDMetadataDocumentSupported: mas.supportsClientIDMetadata,
@@ -184,7 +187,7 @@ func (mas *MockAuthServer) handleAuthorize(w http.ResponseWriter, r *http.Reques
 	codeChallengeMethod := query.Get("code_challenge_method")
 	resource := query.Get("resource")
 
-	if clientID == "" || redirectURI == "" || responseType != "code" {
+	if clientID == "" || redirectURI == "" || responseType != responseTypeCode {
 		http.Error(w, "invalid_request", http.StatusBadRequest)
 		return
 	}
@@ -450,7 +453,7 @@ func (mms *MockMCPServer) handleResourceMetadata(w http.ResponseWriter, r *http.
 	mms.mu.Unlock()
 
 	metadata := &ProtectedResourceMetadata{
-		Resource:               mms.Server.URL,
+		Resource:               mms.URL,
 		AuthorizationServers:   mms.authorizationServers,
 		ScopesSupported:        mms.scopesSupported,
 		BearerMethodsSupported: []string{"header"},
@@ -473,7 +476,7 @@ func (mms *MockMCPServer) handleRequest(w http.ResponseWriter, r *http.Request) 
 		if authHeader == "" {
 			w.Header().Set("WWW-Authenticate", fmt.Sprintf(
 				`Bearer resource_metadata="%s/.well-known/oauth-protected-resource", scope="%s"`,
-				mms.Server.URL,
+				mms.URL,
 				strings.Join(mms.requiredScopes, " "),
 			))
 			w.WriteHeader(http.StatusUnauthorized)
