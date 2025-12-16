@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"mcp-debug/internal/agent"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/giantswarm/mcp-debug/internal/agent"
 
 	"github.com/spf13/cobra"
 )

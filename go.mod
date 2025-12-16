@@ -1,4 +1,4 @@
-module mcp-debug
+module github.com/giantswarm/mcp-debug
 
 go 1.24.6
 
