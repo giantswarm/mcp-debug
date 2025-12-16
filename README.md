@@ -24,11 +24,11 @@
 
 ### Installation
 
-To build the tool from source, run:
+To build the tool from source and install it in your PATH:
+
 ```bash
-make build
+go install github.com/giantswarm/mcp-debug@latest
 ```
-This will create the `mcp-debug` binary in the project directory.
 
 ### Documentation
 
