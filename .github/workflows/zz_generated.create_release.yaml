@@ -20,7 +20,7 @@ permissions: {}
 jobs:
   debug_info:
     name: Debug info
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Print github context JSON
         run: |
@@ -29,7 +29,7 @@ jobs:
           EOF
   gather_facts:
     name: Gather facts
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
@@ -89,7 +89,7 @@ jobs:
           echo "refversion=${refversion}" >> $GITHUB_OUTPUT
   update_project_go:
     name: Update project.go
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     if: ${{ needs.gather_facts.outputs.version != '' && needs.gather_facts.outputs.project_go_path != '' && needs.gather_facts.outputs.ref_version != 'true' }}
@@ -164,7 +164,7 @@ jobs:
           gh pr merge --auto --squash "${{ env.branch }}" || echo "::warning::Auto-merge not allowed. Please adjust the repository settings."
   create_release:
     name: Create release
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     needs:
@@ -214,7 +214,7 @@ jobs:
 
   create-release-branch:
     name: Create release branch
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     needs:
