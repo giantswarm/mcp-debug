@@ -1,11 +1,11 @@
 module github.com/giantswarm/mcp-debug
 
-go 1.24.11
+go 1.25.5
 
 require (
 	github.com/chzyer/readline v1.5.1
 	github.com/creativeprojects/go-selfupdate v1.5.2
-	github.com/mark3labs/mcp-go v0.48.0
+	github.com/mark3labs/mcp-go v0.49.0
 	github.com/spf13/cobra v1.10.2
 )
 
