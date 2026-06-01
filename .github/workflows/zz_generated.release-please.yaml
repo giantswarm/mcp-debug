@@ -1,0 +1,27 @@
+# DO NOT EDIT. Generated with:
+#
+#    devctl
+#
+#    https://github.com/giantswarm/devctl/blob/f0144839bf01f696d83d5f849a4b9c2ee094bba8/pkg/gen/input/workflows/internal/file/release_please.yaml.template
+#
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+permissions: {}
+
+jobs:
+  release_please:
+    uses: giantswarm/github-workflows/.github/workflows/release.yaml@main
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      auto-merge-level: minor
+    secrets:
+      RELEASE_PLEASE_CLIENT_ID: ${{ secrets.RELEASE_PLEASE_CLIENT_ID }}
+      RELEASE_PLEASE_PRIVATE_KEY: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
