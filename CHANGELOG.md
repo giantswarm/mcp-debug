@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.92](https://github.com/giantswarm/mcp-debug/compare/v0.0.91...v0.0.92) (2026-06-01)
+
+
+### Changed
+
+* align files according to platform standards ([#119](https://github.com/giantswarm/mcp-debug/issues/119)) ([ddf89e5](https://github.com/giantswarm/mcp-debug/commit/ddf89e586da44e5dcb074fc284610843a230010b))
+* align files according to platform standards ([#121](https://github.com/giantswarm/mcp-debug/issues/121)) ([61cbf8e](https://github.com/giantswarm/mcp-debug/commit/61cbf8e0ef85acd259c881872d5a30cbdffa2c89))
+
 ## [Unreleased]
 
 ### Fixed
@@ -17,4 +25,4 @@
 - Modified initialization sequence in both `client.go` and `repl.go` to be conditional
 - Updated REPL command handlers to check capabilities before execution
 - Enhanced tab completion to only suggest commands for supported capabilities
-- Added test coverage for capability checking functionality 
+- Added test coverage for capability checking functionality
