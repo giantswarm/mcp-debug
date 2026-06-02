@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.93](https://github.com/giantswarm/mcp-debug/compare/v0.0.92...v0.0.93) (2026-06-02)
+
+
+### Changed
+
+* align files according to platform standards ([#121](https://github.com/giantswarm/mcp-debug/issues/121)) ([61cbf8e](https://github.com/giantswarm/mcp-debug/commit/61cbf8e0ef85acd259c881872d5a30cbdffa2c89))
+* **deps:** update actions/checkout action to v6.0.3 ([#122](https://github.com/giantswarm/mcp-debug/issues/122)) ([d796bd6](https://github.com/giantswarm/mcp-debug/commit/d796bd64ef0d92da981348283dd71fd170502fe4))
+* **main:** release 0.0.92 ([#120](https://github.com/giantswarm/mcp-debug/issues/120)) ([790c965](https://github.com/giantswarm/mcp-debug/commit/790c965087bf5035e775892adecd582a146732e8))
+
 ## [0.0.92](https://github.com/giantswarm/mcp-debug/compare/v0.0.91...v0.0.92) (2026-06-01)
 
 
