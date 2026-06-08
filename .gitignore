@@ -47,4 +47,7 @@ node_modules/
 # Added by Task Master AI
 # Task files
 tasks.json
-tasks/ 
+tasks/
+
+# graphify knowledge graph (regenerable, rebuilt by the post-commit hook)
+graphify-out/
