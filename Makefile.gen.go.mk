@@ -5,6 +5,8 @@
 #    https://github.com/giantswarm/devctl/blob/0ec3e49745962245bdd6d5c282d4272c40faec37/pkg/gen/input/makefile/internal/file/Makefile.gen.go.mk.template
 #
 
+PACKAGE_DIR    := ./bin-dist
+
 APPLICATION    := $(shell go list -m | cut -d '/' -f 3)
 BUILDTIMESTAMP := $(shell date -u '+%FT%TZ')
 GITSHA1        := $(shell git rev-parse --verify HEAD)
@@ -75,6 +77,50 @@ $(APPLICATION)-v$(VERSION)-%-arm64: $(SOURCES)
 $(APPLICATION)-v$(VERSION)-windows-amd64.exe: $(SOURCES)
 	@echo "====> $@"
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$(LDFLAGS)" -o $@ "$(MAIN_SOURCE)"
+
+.PHONY: package-darwin-amd64 package-darwin-arm64 package-linux-amd64 package-linux-arm64 package-windows-amd64
+package-darwin-amd64: $(PACKAGE_DIR)/$(APPLICATION)-v$(VERSION)-darwin-amd64.tar.gz ## Prepares a packaged darwin/amd64 version.
+	@echo "====> $@"
+package-darwin-arm64: $(PACKAGE_DIR)/$(APPLICATION)-v$(VERSION)-darwin-arm64.tar.gz ## Prepares a packaged darwin/arm64 version.
+	@echo "====> $@"
+package-linux-amd64: $(PACKAGE_DIR)/$(APPLICATION)-v$(VERSION)-linux-amd64.tar.gz ## Prepares a packaged linux/amd64 version.
+	@echo "====> $@"
+package-linux-arm64: $(PACKAGE_DIR)/$(APPLICATION)-v$(VERSION)-linux-arm64.tar.gz ## Prepares a packaged linux/arm64 version.
+	@echo "====> $@"
+package-windows-amd64: $(PACKAGE_DIR)/$(APPLICATION)-v$(VERSION)-windows-amd64.zip ## Prepares a packaged windows/amd64 version.
+	@echo "====> $@"
+
+$(PACKAGE_DIR)/$(APPLICATION)-v$(VERSION)-windows-amd64.zip: DIR=$(PACKAGE_DIR)/$(APPLICATION)-v$(VERSION)-windows-amd64
+$(PACKAGE_DIR)/$(APPLICATION)-v$(VERSION)-windows-amd64.zip: $(APPLICATION)-v$(VERSION)-windows-amd64.exe
+	@echo "====> $@"
+	/bin/sh .github/zz_generated.windows-code-signing.sh $(APPLICATION) $(VERSION)
+	@echo "Creating directory $(DIR)"
+	mkdir -p $(DIR)
+	cp $< $(DIR)/$(APPLICATION).exe
+	cp README.md LICENSE $(DIR)
+	cd ./bin-dist && zip $(APPLICATION)-v$(VERSION)-windows-amd64.zip $(APPLICATION)-v$(VERSION)-windows-amd64/*
+	rm -rf $(DIR)
+	rm -rf $<
+
+$(PACKAGE_DIR)/$(APPLICATION)-v$(VERSION)-%-amd64.tar.gz: DIR=$(PACKAGE_DIR)/$<
+$(PACKAGE_DIR)/$(APPLICATION)-v$(VERSION)-%-amd64.tar.gz: $(APPLICATION)-v$(VERSION)-%-amd64
+	@echo "====> $@"
+	mkdir -p $(DIR)
+	cp $< $(DIR)/$(APPLICATION)
+	cp README.md LICENSE $(DIR)
+	tar -C $(PACKAGE_DIR) -cvzf $(PACKAGE_DIR)/$<.tar.gz $<
+	rm -rf $(DIR)
+	rm -rf $<
+
+$(PACKAGE_DIR)/$(APPLICATION)-v$(VERSION)-%-arm64.tar.gz: DIR=$(PACKAGE_DIR)/$<
+$(PACKAGE_DIR)/$(APPLICATION)-v$(VERSION)-%-arm64.tar.gz: $(APPLICATION)-v$(VERSION)-%-arm64
+	@echo "====> $@"
+	mkdir -p $(DIR)
+	cp $< $(DIR)/$(APPLICATION)
+	cp README.md LICENSE $(DIR)
+	tar -C $(PACKAGE_DIR) -cvzf $(PACKAGE_DIR)/$<.tar.gz $<
+	rm -rf $(DIR)
+	rm -rf $<
 
 .PHONY: install
 install: ## Install the application.
