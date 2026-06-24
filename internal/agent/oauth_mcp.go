@@ -313,13 +313,16 @@ func openBrowserImpl(urlStr string) error {
 
 	var cmd *exec.Cmd
 
+	// The opener command is a fixed constant per platform and urlStr is
+	// scheme-validated by validateBrowserURL above, so G204 (subprocess
+	// launched with variable) is a false positive here.
 	switch runtime.GOOS {
 	case "linux":
-		cmd = exec.Command("xdg-open", urlStr)
+		cmd = exec.Command("xdg-open", urlStr) //nolint:gosec // G204: fixed opener, URL validated above
 	case "darwin":
-		cmd = exec.Command("open", urlStr)
+		cmd = exec.Command("open", urlStr) //nolint:gosec // G204: fixed opener, URL validated above
 	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", urlStr)
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", urlStr) //nolint:gosec // G204: fixed opener, URL validated above
 	default:
 		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}

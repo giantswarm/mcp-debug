@@ -81,11 +81,11 @@ graph TD
     B -->|No| D{Resource Metadata<br/>has scopes_supported?}
     D -->|Yes| E[Use scopes_supported<br/>Priority 2]
     D -->|No| F[Omit scope parameter<br/>Priority 3]
-    
+
     C --> G[Request Token]
     E --> G
     F --> G
-    
+
     style C fill:#90EE90
     style E fill:#FFD700
     style F fill:#FFA500
@@ -537,4 +537,3 @@ Monitor for scope creep during step-up:
 - [Examples](examples/): Practical scope management examples
 - [MCP Authorization Spec](https://spec.modelcontextprotocol.io/specification/2025-11-25/basic/authorization/): MCP scope requirements
 - [RFC 6749 Section 3.3](https://www.rfc-editor.org/rfc/rfc6749.html#section-3.3): OAuth 2.0 scope definition
-

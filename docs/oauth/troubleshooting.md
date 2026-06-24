@@ -644,4 +644,3 @@ Include label: `oauth`
 - [Discovery](discovery.md): Discovery mechanisms
 - [Testing](testing.md): Compatibility flags
 - [Examples](examples/): Working examples
-

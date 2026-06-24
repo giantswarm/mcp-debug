@@ -189,4 +189,3 @@ ERROR: Invalid redirect_uri parameter
 - [Example 3: Manual Scope Configuration](03-manual-scopes.md)
 - [Example 4: Testing Legacy Servers](04-legacy-servers.md)
 - [Security Documentation](../security.md)
-

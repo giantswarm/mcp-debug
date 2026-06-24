@@ -340,7 +340,7 @@ Resource URIs **SHOULD** use HTTPS in production:
 ./mcp-debug --oauth --endpoint https://mcp.example.com/mcp  ✓
 
 # Development only
-./mcp-debug --oauth --endpoint http://localhost:8090/mcp   ⚠ 
+./mcp-debug --oauth --endpoint http://localhost:8090/mcp   ⚠
 ```
 
 HTTP endpoints are acceptable for localhost development but not production.
@@ -435,4 +435,3 @@ When migrating from non-RFC 8707 to RFC 8707:
 - [Configuration](configuration.md): All OAuth configuration options
 - [RFC 8707](https://www.rfc-editor.org/rfc/rfc8707.html): Resource Indicators specification
 - [MCP Authorization Spec](https://spec.modelcontextprotocol.io/specification/2025-11-25/basic/authorization/): MCP resource indicator requirements
-

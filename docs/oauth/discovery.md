@@ -456,4 +456,3 @@ ERROR: Per MCP spec, PKCE is required for security
 - [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728): Protected Resource Metadata specification
 - [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414.html): Authorization Server Metadata specification
 - [MCP Authorization Spec](https://spec.modelcontextprotocol.io/specification/2025-11-25/basic/authorization/): MCP OAuth requirements
-

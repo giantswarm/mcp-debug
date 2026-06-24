@@ -197,4 +197,3 @@ OAuth authentication involves sensitive credentials and tokens. Please review th
 - Read [Discovery](discovery.md) to understand how `mcp-debug` finds authorization servers
 - Review [Configuration](configuration.md) for all available options
 - Try the [Basic Authentication Example](examples/01-basic-auth.md)
-

@@ -69,7 +69,7 @@ The tool supports multiple modes:
 - REPL mode (--repl): Interactive exploration and execution
 - MCP Server mode (--mcp-server): Act as an MCP server for integration with AI assistants
 
-The agent connects to an MCP server as a client agent, 
+The agent connects to an MCP server as a client agent,
 logs all JSON-RPC communication, and demonstrates dynamic tool updates.
 
 This is useful for debugging MCP server behavior, verifying that

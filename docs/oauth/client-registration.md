@@ -37,12 +37,12 @@ graph TD
     D -->|No| F{AS supports<br/>DCR?}
     F -->|Yes| G[Dynamic Client Registration]
     F -->|No| H[Prompt User for Credentials]
-    
+
     C --> I[Proceed to Authorization]
     E --> I
     G --> I
     H --> I
-    
+
     style C fill:#90EE90
     style E fill:#87CEEB
     style G fill:#FFD700
@@ -179,16 +179,16 @@ graph TD
     D -->|No| F{Explicit CIMD<br/>URL provided?}
     F -->|Yes| G[Use Provided URL]
     F -->|No| H[Use Default CIMD URL]
-    
+
     C --> I[Proceed to Authorization]
     G --> I
     H --> I
     E --> I
-    
+
     H --> J{AS rejects<br/>CIMD?}
     J -->|Yes| E
     J -->|No| I
-    
+
     style H fill:#90EE90
     style G fill:#87CEEB
 ```
@@ -666,4 +666,3 @@ CIMD was not used even though expected.
 - [RFC 7591](https://www.rfc-editor.org/rfc/rfc7591.html): Dynamic Client Registration specification
 - [Client ID Metadata Documents](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-00): CIMD specification (draft)
 - [MCP Authorization Spec](https://spec.modelcontextprotocol.io/specification/2025-11-25/basic/authorization/): MCP client registration requirements
-

@@ -213,4 +213,3 @@ See [Example 2](02-pre-registered.md) for details.
 - [Example 2: Pre-Registered Client](02-pre-registered.md)
 - [Example 3: Manual Scope Configuration](03-manual-scopes.md)
 - [Example 4: Testing Legacy Servers](04-legacy-servers.md)
-
