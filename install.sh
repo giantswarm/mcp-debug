@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-# This script downloads the latest mcp-debug .tar.gz release archive by
-# querying the GitHub API for the latest tag, constructing the correct filename,
-# and extracting the binary. It avoids dependencies like jq.
+# This script downloads the latest mcp-debug binary by querying the GitHub API
+# for the latest release tag and fetching the matching per-platform asset
+# (mcp-debug-<os>-<arch>). It avoids dependencies like jq.
 
 # Helper function for logging
 info() {
@@ -11,7 +11,7 @@ info() {
 }
 
 # Check for required tools
-for tool in curl grep sed tar tr uname; do
+for tool in curl grep sed tr uname; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "[ERROR] '$tool' is not installed. Please install it to continue."
         exit 1
@@ -45,23 +45,18 @@ if [ -z "$LATEST_TAG" ]; then
 fi
 
 info "Latest version tag is $LATEST_TAG"
-VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
 
-# Construct the download URL for the .tar.gz archive
-ARCHIVE_NAME="mcp-debug_${VERSION}_${OS}_${ARCH}.tar.gz"
-DOWNLOAD_URL="https://github.com/giantswarm/mcp-debug/releases/download/${LATEST_TAG}/${ARCHIVE_NAME}"
+# Construct the download URL. Releases are built by the architect CircleCI
+# pipeline (cli flavour), which attaches a raw, per-platform binary named
+# mcp-debug-<os>-<arch> to the GitHub Release -- not a versioned tarball.
+BINARY_NAME="mcp-debug-${OS}-${ARCH}"
+DOWNLOAD_URL="https://github.com/giantswarm/mcp-debug/releases/download/${LATEST_TAG}/${BINARY_NAME}"
 
 info "Constructed download URL: $DOWNLOAD_URL"
 
-# Download the archive
-curl -L -o "${ARCHIVE_NAME}" "${DOWNLOAD_URL}"
+# Download the binary directly.
+curl -fL -o mcp-debug "${DOWNLOAD_URL}"
 info "Download complete."
-
-# Un-tar the archive to extract the binary and then clean up
-info "Extracting binary from ${ARCHIVE_NAME}..."
-tar -xzf "${ARCHIVE_NAME}" mcp-debug
-rm "${ARCHIVE_NAME}"
-info "Extraction complete."
 
 chmod +x mcp-debug
 info "Made binary executable."
@@ -69,4 +64,4 @@ info "Made binary executable."
 info "Installation successful! The 'mcp-debug' binary is now in your current directory."
 info "You can run it with: ./mcp-debug"
 info "For system-wide access, move it to a directory in your PATH, e.g.:"
-info "sudo mv mcp-debug /usr/local/bin/mcp-debug" 
+info "sudo mv mcp-debug /usr/local/bin/mcp-debug"
