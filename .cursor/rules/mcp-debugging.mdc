@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: false
 ---
 ## Debugging MCP Servers via MCP-Debug Agent
@@ -44,7 +44,7 @@ This mode is designed for integration with AI assistants like Claude or Cursor. 
 ### Listing Commands
 ```
 list tools                   # List all available tools
-list resources               # List all available resources  
+list resources               # List all available resources
 list prompts                 # List all available prompts
 ```
 
@@ -160,7 +160,7 @@ To use mcp-debug as an MCP server in Cursor:
 
 2. The agent exposes these tools:
 - `list_tools` - List all available tools
-- `list_resources` - List all available resources  
+- `list_resources` - List all available resources
 - `list_prompts` - List all available prompts
 - `describe_tool` - Get tool details
 - `describe_resource` - Get resource details

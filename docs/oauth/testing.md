@@ -330,7 +330,7 @@ ERROR: code_challenge_methods_supported: []
 This is a **critical security issue**. The server must support PKCE per MCP specification.
 
 1. **Report to server operator** - PKCE is required
-2. **Check AS metadata** - Verify `code_challenge_methods_supported`  
+2. **Check AS metadata** - Verify `code_challenge_methods_supported`
 3. **Do not proceed** - PKCE is mandatory for security
 
 The MCP specification requires PKCE support. There is no bypass available.
@@ -469,4 +469,3 @@ Please update authorization server to support and advertise PKCE.
 - [Configuration](configuration.md): Complete flag reference
 - [Troubleshooting](troubleshooting.md): Common issues
 - [MCP Authorization Spec](https://spec.modelcontextprotocol.io/specification/2025-11-25/basic/authorization/): Compliance requirements
-

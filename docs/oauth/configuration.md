@@ -111,27 +111,27 @@ type OAuthConfig struct {
     ClientSecret         string   // OAuth client secret (optional)
     RedirectURL          string   // Callback URL (default: http://localhost:8765/callback)
     AuthorizationTimeout duration // Max wait for authorization (default: 5m)
-    
+
     // Scope Management
     Scopes             []string // OAuth scopes to request
     ScopeSelectionMode string   // "auto" (default) or "manual"
-    
+
     // Security Features
     UsePKCE   bool // Use PKCE (default: true)
     UseOIDC   bool // Enable OIDC features (default: false)
-    
+
     // Discovery
     ResourceURI          string // Target resource URI (auto-derived if empty)
     PreferredAuthServer  string // Preferred AS when multiple available
-    
+
     // Client Registration
     RegistrationToken string // Registration access token for DCR
-    
+
     // Step-Up Authorization
     EnableStepUpAuth   bool // Enable step-up (default: true)
     StepUpMaxRetries   int  // Max retries (default: 2)
     StepUpUserPrompt   bool // Ask user before step-up (default: false)
-    
+
     // Compatibility/Testing
     SkipResourceParam          bool // Skip RFC 8707 (default: false)
     SkipResourceMetadata       bool // Skip RFC 9728 (default: false)
@@ -371,4 +371,3 @@ Error: "invalid scope selection mode: xyz (must be 'auto' or 'manual')"
 - [Discovery](discovery.md): What auto-discovery configures
 - [Troubleshooting](troubleshooting.md): Configuration-related errors
 - [Examples](examples/): Complete configuration examples
-

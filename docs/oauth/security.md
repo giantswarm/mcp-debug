@@ -80,7 +80,7 @@ sequenceDiagram
     Note over A: Attacker intercepts redirect
     A->>AS: Exchange code for token<br/>(no verifier)
     AS->>A: ERROR: code_verifier required
-    
+
     Note over C: Use original code
     C->>AS: Exchange code + code_verifier
     AS->>C: ✓ Access Token (verified!)
@@ -493,4 +493,3 @@ Security model assumes:
 - [Testing](testing.md): Testing with security features disabled
 - [Troubleshooting](troubleshooting.md): Security-related errors
 - [MCP Authorization Spec](https://spec.modelcontextprotocol.io/specification/2025-11-25/basic/authorization/): Official requirements
-

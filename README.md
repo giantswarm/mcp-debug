@@ -98,4 +98,4 @@ Contributions are welcome! Please open an issue or submit a pull request.
 
 ## License
 
-`mcp-debug` is licensed under the Apache 2.0 License. 
+`mcp-debug` is licensed under the Apache 2.0 License.

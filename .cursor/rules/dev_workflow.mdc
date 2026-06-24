@@ -213,7 +213,7 @@ After creating a PR or pushing new commits to an existing PR, you **MUST** activ
     gh pr checks
     gh run view <run-id> --log-failed
     ```
-    
+
     **Common Failures:**
     - **Lint failures:** Run `make lint` locally, fix issues, commit, push.
     - **Build failures:** Run `go build ./...` locally, fix, commit, push.
@@ -223,11 +223,11 @@ After creating a PR or pushing new commits to an existing PR, you **MUST** activ
     ```bash
     # Fix the issue locally
     make lint  # or whatever failed
-    
+
     # Commit the fix
     git add .
     git commit -m "fix(ci): resolve <check-name> failure"
-    
+
     # Push and monitor again
     git push
     sleep 20

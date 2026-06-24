@@ -244,7 +244,7 @@ The registration access token is a sensitive credential that must be protected:
 1. **HTTPS Required**: The token will ONLY be transmitted over HTTPS connections. Attempts to use HTTP will fail with a security error.
 2. **Endpoint Validation**: The token is only injected into recognized OAuth registration endpoints (e.g., `/oauth/register`, `/oauth2/registration`) to prevent token leakage.
 3. **Storage**: Store registration tokens in environment variables or secure vaults, never commit them to version control.
-4. **Token Lifecycle**: 
+4. **Token Lifecycle**:
    - Obtain tokens from your authorization server administrator
    - Tokens may have expiration times - check with your administrator
    - Rotate tokens regularly as part of security best practices
@@ -839,4 +839,4 @@ Available tools:
 ```bash
 ./mcp-debug --mcp-server --server-transport streamable-http --listen-addr :9000
 ```
-Then, configure your AI assistant to connect to `http://localhost:9000/mcp`. 
+Then, configure your AI assistant to connect to `http://localhost:9000/mcp`.

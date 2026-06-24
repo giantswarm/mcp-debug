@@ -301,4 +301,3 @@ ERROR: Granted scopes: [mcp:read]
 - [Example 1: Basic OAuth](01-basic-auth.md): Auto mode example
 - [Example 4: Testing Legacy Servers](04-legacy-servers.md)
 - [Configuration Reference](../configuration.md): All scope-related flags
-
