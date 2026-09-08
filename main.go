@@ -1,11 +1,11 @@
 package main
 
-import "github.com/giantswarm/mcp-debug/cmd"
-
-// Version can be set during build with -ldflags
-var version = "dev"
+import (
+	"github.com/giantswarm/mcp-debug/cmd"
+	"github.com/giantswarm/mcp-debug/pkg/project"
+)
 
 func main() {
-	cmd.SetVersion(version)
+	cmd.SetVersion(project.Version())
 	cmd.Execute()
 }
