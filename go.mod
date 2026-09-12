@@ -84,7 +84,7 @@ require (
 	github.com/42wim/httpsig v1.2.4 // indirect
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/davidmz/go-pageant v1.0.2 // indirect
-	github.com/giantswarm/selfupdate-cosign v0.1.1
+	github.com/giantswarm/selfupdate-cosign v0.2.0
 	github.com/go-fed/httpsig v1.1.0 // indirect
 	github.com/google/go-github/v86 v86.0.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
