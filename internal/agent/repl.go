@@ -43,6 +43,32 @@ func classifyReadline(err error) (replAction, error) {
 	}
 }
 
+const (
+	historyFileName     = "history"
+	historyFallbackName = ".mcp_debug_history"
+)
+
+// historyFilePath returns the file readline stores the REPL history in.
+//
+// The history holds whatever was typed at the prompt, tool arguments
+// included, so it belongs in the per-user cache directory rather than in a
+// temporary directory every account on the host can read. The directory is
+// created with owner-only permissions. The temporary directory stays as a
+// fallback for a host with no usable cache directory.
+func historyFilePath() string {
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		return filepath.Join(os.TempDir(), historyFallbackName)
+	}
+
+	dir := filepath.Join(cache, "mcp-debug")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return filepath.Join(os.TempDir(), historyFallbackName)
+	}
+
+	return filepath.Join(dir, historyFileName)
+}
+
 // REPL represents the Read-Eval-Print Loop for MCP interaction
 type REPL struct {
 	client          *Client
@@ -68,7 +94,7 @@ func NewREPL(client *Client, logger *Logger) *REPL {
 func (r *REPL) Run(ctx context.Context) error {
 	// Set up readline with tab completion
 	completer := r.createCompleter()
-	historyFile := filepath.Join(os.TempDir(), ".mcp_debug_history")
+	historyFile := historyFilePath()
 
 	config := &readline.Config{
 		Prompt:          "MCP> ",

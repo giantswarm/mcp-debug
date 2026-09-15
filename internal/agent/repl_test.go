@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/chzyer/readline"
@@ -63,5 +66,28 @@ func TestClassifyReadline(t *testing.T) {
 				t.Errorf("fatal = %v, want it to wrap %v", fatal, tt.wantFatal)
 			}
 		})
+	}
+}
+
+func TestHistoryFilePath(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		t.Skipf("no user cache directory on this host: %v", err)
+	}
+
+	got := historyFilePath()
+
+	want := filepath.Join(cache, "mcp-debug", historyFileName)
+	if got != want {
+		t.Errorf("historyFilePath() = %q, want %q", got, want)
+	}
+	info, err := os.Stat(filepath.Dir(got))
+	if err != nil {
+		t.Fatalf("history directory was not created: %v", err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o700 {
+		t.Errorf("history directory mode = %v, want 0700", info.Mode().Perm())
 	}
 }
