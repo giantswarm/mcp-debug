@@ -2,7 +2,7 @@
 #
 #    devctl
 #
-#    https://github.com/giantswarm/devctl/blob/2f703bd6f38776affc0a48fe41da33d2cb37714d/pkg/gen/input/workflows/internal/file/auto_release.yaml.template
+#    https://github.com/giantswarm/devctl/blob/222eaeb41d8eac44c7b6862c0df057e840da8e1f/pkg/gen/input/workflows/internal/file/auto_release.yaml.template
 #
 # yamllint disable rule:truthy
 # Push-based release tagger + release-page publisher.
@@ -91,7 +91,7 @@ jobs:
           tarball_binary_path: 'git-cliff-${version}/git-cliff'
           smoke_test: '${binary} --version'
 
-      - name: Compute next version and render release notes
+      - name: Compute next version
         id: cliff
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -112,16 +112,12 @@ jobs:
           #                         release only. This is what we want.
           #
           # Without either filter, --bump --context returns the full release
-          # history in JSON and the render below would concatenate every
+          # history in JSON and the render step below would concatenate every
           # past release into each new release's notes.
           git-cliff --unreleased --bump --context > cliff-context.json
           NEXT=$(jq -r '.[0].version // empty' cliff-context.json)
           echo "next computed: ${NEXT:-<empty>}"
           echo "version=${NEXT}" >> "$GITHUB_OUTPUT"
-          # Cheap render from the cached context -- no API calls, no git walk.
-          # `--strip all` drops header/footer; body-only is what gh release
-          # create --notes-file expects.
-          git-cliff --from-context cliff-context.json --strip all --output release-notes.md
 
       # feat-rc:/fix-rc: mark a change as belonging to a release candidate.
       # The decision is taken over EVERY unreleased commit, not just the ones
@@ -157,12 +153,13 @@ jobs:
           # (the baseline of the 2.x line) and we end up tagging v2.3.6 rather
           # than something nonsensical relative to v3.0.0.
           #
-          # `--exclude='*-*'` keeps pre-release tags out of that baseline, to
-          # match cliff.toml's `ignore_tags`. Without it a v1.3.0-rc.1 on the
-          # branch becomes `last`, the `NEXT = last` comparison below can never
-          # be true again, and the job tags on every push even when there is
-          # nothing to release.
-          last=$(git describe --tags --abbrev=0 --match='v*.*.*' --exclude='*-*' 2>/dev/null || echo "")
+          # The excludes hold this baseline to the tags cliff.toml's
+          # `tag_pattern` counts as releases: `*-*` drops a pre-release name,
+          # `*+*` a build-metadata one. A tag only one of the two recognises
+          # splits `last` from `NEXT`, the `NEXT = last` comparison below can
+          # never be true again, and the job tags on every push even when
+          # there is nothing to release.
+          last=$(git describe --tags --abbrev=0 --match='v*.*.*' --exclude='*-*' --exclude='*+*' 2>/dev/null || echo "")
           echo "branch: ${GITHUB_REF_NAME}"
           echo "last reachable stable tag: ${last:-<none>}"
 
@@ -253,6 +250,30 @@ jobs:
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "prerelease=${is_rc}" >> "$GITHUB_OUTPUT"
 
+      # cliff-context.json names the stable target git-cliff bumped to, and
+      # the tag actually cut is ${NEXT}-rc.N for a candidate. cliff.toml puts
+      # `{{ version }}` in the "Full Changelog" compare link, so the context has
+      # to carry the chosen tag before the render or the link points at a tag
+      # that does not exist. The render reads the cached context, so the one
+      # expensive git-cliff call above stays the only one.
+      - name: Render release notes
+        id: notes
+        if: steps.decide.outputs.tag != ''
+        env:
+          TAG: ${{ steps.decide.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # `error` rather than a silent `[{version: $tag}]`: jq builds that
+          # object out of an empty context, and the render would then produce
+          # empty notes for a tag that is about to be created.
+          jq --arg tag "$TAG" \
+            'if (.[0].version // "") == "" then error("cliff-context.json carries no version") else .[0].version = $tag end' \
+            cliff-context.json > cliff-context.tagged.json
+          # Cheap render from the cached context -- no API calls, no git walk.
+          # `--strip all` drops header/footer; body-only is what gh release
+          # create --notes-file expects.
+          git-cliff --from-context cliff-context.tagged.json --strip all --output release-notes.md
+
       # Create the tag AND the GitHub Release in one atomic API call. GitHub's
       # release-create endpoint accepts a tag_name + target_commitish and, if
       # the tag doesn't already exist, creates it pointing at that commitish
@@ -266,6 +287,7 @@ jobs:
       # gitsemver, gh release view -- both behave identically. Nothing in the
       # giantswarm stack distinguishes them.
       - name: Create release (and the tag, atomically)
+        id: release
         if: steps.decide.outputs.tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
