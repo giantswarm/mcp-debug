@@ -16,6 +16,33 @@ import (
 // errExit is a sentinel error used to signal REPL exit
 var errExit = errors.New("exit")
 
+// replAction is what the REPL loop does with the result of one Readline call.
+type replAction int
+
+const (
+	replExecute replAction = iota
+	replSkip
+	replQuit
+)
+
+// classifyReadline maps a Readline result to the next step of the REPL loop.
+// A non-nil error is fatal.
+//
+// readline returns the partially typed text alongside ErrInterrupt, so an
+// interrupted line must be discarded rather than dispatched as a command.
+func classifyReadline(err error) (replAction, error) {
+	switch {
+	case err == nil:
+		return replExecute, nil
+	case errors.Is(err, readline.ErrInterrupt):
+		return replSkip, nil
+	case errors.Is(err, io.EOF):
+		return replQuit, nil
+	default:
+		return replSkip, fmt.Errorf("readline error: %w", err)
+	}
+}
+
 // REPL represents the Read-Eval-Print Loop for MCP interaction
 type REPL struct {
 	client          *Client
@@ -83,17 +110,18 @@ func (r *REPL) Run(ctx context.Context) error {
 
 		// Read input
 		line, err := rl.Readline()
-		if err == readline.ErrInterrupt {
-			if len(line) == 0 {
-				continue
-			}
-		} else if err == io.EOF {
+		action, fatal := classifyReadline(err)
+		if fatal != nil {
+			return fatal
+		}
+		switch action {
+		case replSkip:
+			continue
+		case replQuit:
 			close(r.stopChan)
 			r.wg.Wait()
 			r.logger.Info("Goodbye!")
 			return nil
-		} else if err != nil {
-			return fmt.Errorf("readline error: %w", err)
 		}
 
 		input := strings.TrimSpace(line)
