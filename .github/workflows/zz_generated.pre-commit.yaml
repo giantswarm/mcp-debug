@@ -2,7 +2,7 @@
 #
 #    devctl
 #
-#    https://github.com/giantswarm/devctl/blob/4a012b2c416d7ce4c52935582279525e88fad93f/pkg/gen/input/precommit/internal/file/pre-commit-action.yaml.template
+#    https://github.com/giantswarm/devctl/blob/6dc24309a46587e01ddebe9fd12fb961e108b873/pkg/gen/input/precommit/internal/file/pre-commit-action.yaml.template
 #
 name: pre-commit
 
@@ -15,9 +15,7 @@ on:
       - master
 
 env:
-  HELM_VERSION: "3.21.4"
   HELM_DOCS_VERSION: "1.14.2"
-  HELM_VALUES_SCHEMA_JSON_VERSION: "2.6.0"
 
 jobs:
   pre-commit:
