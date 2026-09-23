@@ -2,7 +2,7 @@
 #
 #    devctl
 #
-#    https://github.com/giantswarm/devctl/blob/222eaeb41d8eac44c7b6862c0df057e840da8e1f/pkg/gen/input/workflows/internal/file/auto_release.yaml.template
+#    https://github.com/giantswarm/devctl/blob/a633db04f5335da13f95d2888ce7857b0f134856/pkg/gen/input/workflows/internal/file/auto_release.yaml.template
 #
 # yamllint disable rule:truthy
 # Push-based release tagger + release-page publisher.
@@ -46,6 +46,8 @@ on:
   # Manual escape hatch. `auto` applies the same rule as a push, which is what
   # a re-run wants. `stable` closes a release-candidate cycle when the last RC
   # is good and there is no pull request left to merge; `rc` forces one more.
+  # Neither tags anything once the cycle has closed: both need something
+  # unreleased on the branch.
   workflow_dispatch:
     inputs:
       release-type:
@@ -168,6 +170,7 @@ jobs:
           # the rest is the body.
           marked=0
           blocking=0
+          unconventional=0
           while IFS= read -r -d '' commit; do
             subject=${commit%%$'\n'*}
             # The two subject patterns are mutually exclusive: after "feat" the
@@ -184,9 +187,20 @@ jobs:
             elif printf '%s' "$subject" | grep -qE '^(feat|fix)(\([^)]*\))?!?:|^[a-z]+(\([^)]*\))?!:' \
               || printf '%s' "$commit" | grep -qE '^BREAKING[ -]CHANGE:'; then
               blocking=$((blocking + 1))
+            elif ! printf '%s' "$subject" | grep -qE '^[a-z]+(-rc)?(\([^)]*\))?!?: '; then
+              # git-cliff drops a subject it cannot parse as conventional
+              # (`filter_unconventional`): the commit neither bumps the
+              # version nor appears in any release's notes, silently. The
+              # title check guards the pull request's title, but a
+              # one-commit pull request squash-merges under its commit's
+              # own subject unless the repository names the squash commit
+              # after the title (squash_merge_commit_title PR_TITLE, the
+              # repository baseline). Say so where the run is read.
+              unconventional=$((unconventional + 1))
+              echo "::warning title=Unconventional commit subject::\"${subject}\" is not a conventional commit: git-cliff neither releases nor lists it. A one-commit pull request merges under its commit's subject unless the repository's squash commit title is PR_TITLE."
             fi
           done < <(git log ${last:+"${last}..HEAD"} -z --format='%s%n%b')
-          echo "unreleased commits: ${marked} marked -rc, ${blocking} unmarked deciding"
+          echo "unreleased commits: ${marked} marked -rc, ${blocking} unmarked deciding, ${unconventional} unconventional (neither released nor listed)"
 
           if [ "$marked" -gt 0 ] && [ "$blocking" -eq 0 ]; then
             is_rc=true
@@ -198,7 +212,12 @@ jobs:
             stable) is_rc=false ;;
           esac
 
-          if [ -z "${NEXT}" ] || { [ "$is_rc" = false ] && [ "${NEXT}" = "${last}" ]; }; then
+          # `NEXT` equal to `last` means nothing releasable landed since the
+          # last stable release. A candidate needs an open cycle to extend and
+          # there is none in that state, so this covers a forced `rc` too:
+          # without it the run cuts ${last}-rc.$(( n + 1 )), a candidate for a
+          # version that already shipped.
+          if [ -z "${NEXT}" ] || [ "${NEXT}" = "${last}" ]; then
             echo "No releasable commits since ${last:-inception}; skipping tag."
             echo "tag=" >> "$GITHUB_OUTPUT"
             echo "prerelease=" >> "$GITHUB_OUTPUT"
@@ -404,10 +423,15 @@ jobs:
                   "Set the CIRCLECI_API_TOKEN org secret to make this check real."
                 exit 0
               fi
-              echo "::error::CircleCI has no project gh/${GITHUB_REPOSITORY} (or the token's account cannot see it)" \
-                "although .circleci/config.yml exists: ${TAG} is released but nothing builds it." \
-                "Set the project up on CircleCI, then trigger the tag: ${manual}"
-              exit 1
+              # The first tag of a repository created pull-request-last lands
+              # before the repository set-up reconciler follows the project on
+              # CircleCI; the reconciler reports the missed tag build and never
+              # rebuilds a tag. Following takes an administrator's token this
+              # workflow does not hold, so this is not the workflow's to fix.
+              echo "::warning::${TAG} is released; CircleCI does not follow this project yet." \
+                "The repository set-up reconciler follows it and reports the missed tag build —" \
+                "cut the next tag, or trigger this tag's pipeline by hand once the project is followed: https://app.circleci.com/pipelines/github/${GITHUB_REPOSITORY}"
+              exit 0
               ;;
             401|403)
               echo "::error::CircleCI rejected CIRCLECI_API_TOKEN (HTTP ${last_code}); cannot verify that ${TAG} was built."
