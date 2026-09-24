@@ -16,11 +16,13 @@ import (
 // mcp-debug binaries, one per platform, each next to its cosign Sigstore bundle.
 const githubRepoSlug = "giantswarm/mcp-debug"
 
-// Seams for the tests: where releases come from (nil is GitHub) and which file
-// the update replaces (the running executable).
+// Seams for the tests: where releases come from (nil is GitHub), which file
+// the update replaces (the running executable) and what a download must verify
+// against before it is installed (its cosign Sigstore bundle).
 var (
 	selfUpdateSource     selfupdate.Source
 	selfUpdateExecutable = selfupdate.ExecutablePath
+	selfUpdateValidator  = func() selfupdate.Validator { return selfupdatecosign.New(githubRepoSlug) }
 )
 
 // newSelfUpdateCmd creates the Cobra command for the self-update functionality.
@@ -67,9 +69,9 @@ func runSelfUpdate(cmd *cobra.Command, args []string) error {
 	updater, err := selfupdate.NewUpdater(selfupdate.Config{
 		Source: selfUpdateSource,
 		// The validator makes DetectLatest look for <asset>.bundle next to the
-		// binary and UpdateTo verify the download against it before anything
+		// binary and Install verify the download against it before anything
 		// is written.
-		Validator: selfupdatecosign.New(githubRepoSlug),
+		Validator: selfUpdateValidator(),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create updater: %w", err)
@@ -104,9 +106,11 @@ func runSelfUpdate(cmd *cobra.Command, args []string) error {
 
 	_, _ = fmt.Fprintf(out, "Updating %s to version %s...\n", exe, latest.Version())
 
-	// Download the binary and its bundle, verify, then replace the current one;
-	// a failed verification leaves the file untouched.
-	if err := updater.UpdateTo(ctx, latest, exe); err != nil {
+	// Download the binary and its bundle, verify, then rename it over the
+	// current one, symbolic links resolved, in a single step: a process that
+	// starts it meanwhile runs the old binary or the new one, and several
+	// updates may run at once. A failed verification leaves the file untouched.
+	if err := selfupdatecosign.Install(ctx, updater, latest, exe); err != nil {
 		return fmt.Errorf("update failed, %s is unchanged: %w", exe, err)
 	}
 
