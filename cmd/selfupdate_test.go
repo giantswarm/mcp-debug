@@ -225,3 +225,73 @@ func TestRunSelfUpdateRefusesADownloadThatDoesNotVerify(t *testing.T) {
 	}
 	assertUnchanged(t, exe, installed)
 }
+
+// accepting stands in for the cosign validator when a download verifies.
+type accepting struct{}
+
+func (accepting) GetValidationAssetName(name string) string { return name + ".bundle" }
+func (accepting) Validate(string, []byte, []byte) error     { return nil }
+
+// A verified release replaces the file the executable path names, symbolic
+// links resolved, with a single rename: the file keeps its mode, the link
+// keeps naming it, and nothing is left beside it.
+func TestRunSelfUpdateInstallsAVerifiedReleaseInPlace(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("on Windows the update is go-selfupdate's own swap")
+	}
+	src := &fakeSource{
+		release: fakeRelease{tag: "v99.0.0", assets: []selfupdate.SourceAsset{
+			fakeAsset{1, binaryAsset()},
+			fakeAsset{2, binaryAsset() + ".bundle"},
+		}},
+		assets: map[int64][]byte{1: []byte("a newer mcp-debug"), 2: []byte("its bundle")},
+	}
+	exe, _ := selfUpdateFixture(t, src)
+	prevValidator := selfUpdateValidator
+	selfUpdateValidator = func() selfupdate.Validator { return accepting{} }
+	t.Cleanup(func() { selfUpdateValidator = prevValidator })
+	if err := os.Chmod(exe, 0o750); err != nil { //nolint:gosec // an executable
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), filepath.Base(exe))
+	if err := os.Symlink(exe, link); err != nil {
+		t.Skipf("no symbolic links here: %v", err)
+	}
+	selfUpdateExecutable = func() (string, error) { return link, nil }
+
+	var out bytes.Buffer
+	cmd := newSelfUpdateCmd()
+	cmd.SetOut(&out)
+	if err := runSelfUpdate(cmd, nil); err != nil {
+		t.Fatalf("runSelfUpdate: %v", err)
+	}
+
+	got, err := os.ReadFile(exe) //nolint:gosec // the test's own temp file
+	if err != nil || string(got) != "a newer mcp-debug" {
+		t.Errorf("%s holds %q (%v), want the release's binary", exe, got, err)
+	}
+	info, err := os.Stat(exe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode := info.Mode().Perm(); mode != 0o750 {
+		t.Errorf("%s has mode %v, want it to keep -rwxr-x---", exe, mode)
+	}
+	if dest, err := os.Readlink(link); err != nil || dest != exe {
+		t.Errorf("the link names %q (%v), want %s", dest, err, exe)
+	}
+	entries, err := os.ReadDir(filepath.Dir(exe))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Errorf("%s holds %q, want only %s", filepath.Dir(exe), names, filepath.Base(exe))
+	}
+	if !strings.Contains(out.String(), "Verified the signature and updated to version 99.0.0") {
+		t.Errorf("the update should be reported, got:\n%s", out.String())
+	}
+}

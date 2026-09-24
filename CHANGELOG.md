@@ -20,6 +20,7 @@
 ## [Unreleased]
 
 ### Fixed
+- `self-update` replaces the binary, symbolic links resolved, with a single rename (`selfupdatecosign.Install`, selfupdate-cosign v0.3.0). go-selfupdate's own swap moved the binary aside before it moved the new one in, so a process started in between found none, and concurrent updates could lose it. Now a process started meanwhile runs the old binary or the new one, several updates may run at once, and the binary keeps its mode.
 - **MCP Server Capability Compatibility**: Fixed issue where `mcp-debug` would crash when connecting to MCP servers that don't support all capabilities (tools, resources, prompts). The client now:
   - Checks server capabilities during initialization
   - Only attempts to list capabilities that the server actually supports
