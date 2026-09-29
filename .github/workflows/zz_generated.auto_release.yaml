@@ -2,7 +2,7 @@
 #
 #    devctl
 #
-#    https://github.com/giantswarm/devctl/blob/2e297ae5925e0f86b604a6f5b54568dcb43a7b60/pkg/gen/input/workflows/internal/file/auto_release.yaml.template
+#    https://github.com/giantswarm/devctl/blob/487b57c7dfa3a535f3954b9e4ffbec97edade8fc/pkg/gen/input/workflows/internal/file/auto_release.yaml.template
 #
 # yamllint disable rule:truthy
 # Push-based release tagger + release-page publisher.
@@ -61,6 +61,8 @@ permissions:
   # git-cliff's GitHub API lookups (commit.remote.pr_number / username
   # in release notes) need PR read access via GITHUB_TOKEN.
   pull-requests: read
+  # The stable run reads the commit statuses of the candidate it promotes.
+  statuses: read
 
 # Scope the concurrency lock per branch so a backport tag on release-2.x
 # doesn't block (or get blocked by) a main release, and vice versa. A second
@@ -101,6 +103,9 @@ jobs:
       - name: Resolve the candidate to promote
         id: promote
         if: inputs.release-type == 'stable'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           # The same baseline as the decide step below.
@@ -117,15 +122,34 @@ jobs:
             exit 1
           fi
 
+          # The tag alone does not say the candidate was built. Its GitHub
+          # pre-release is created with the tag, and the pipelines that build
+          # and publish it report on its commit: a failed or still running one
+          # refuses the promotion. A commit no pipeline reports on has nothing
+          # to wait for.
+          if ! prerelease=$(gh release view "$rc" --json isPrerelease --jq .isPrerelease 2>/dev/null); then
+            echo "::error title=Candidate not released::${rc} has no GitHub release; the run that cut it did not finish. Cut a new candidate."
+            exit 1
+          fi
+          if [ "$prerelease" != true ]; then
+            echo "::error title=Candidate not a pre-release::the GitHub release of ${rc} is not a pre-release."
+            exit 1
+          fi
+          read -r state count < <(gh api "repos/${GH_REPO}/commits/${rc}/status" --jq '"\(.state) \(.total_count)"')
+          if [ "$count" != 0 ] && [ "$state" != success ]; then
+            echo "::error title=Candidate not built::the commit statuses of ${rc} are ${state}: https://github.com/${GH_REPO}/commit/$(git rev-parse "${rc}^{commit}"). Promote it once its pipelines passed."
+            exit 1
+          fi
+
           after=$(git log --format='%h %s' "${rc}..HEAD")
           git checkout -q --detach "$rc"
           echo "promoting ${rc} at $(git rev-parse --short HEAD)"
           if [ -n "$after" ]; then
-            echo "not in this release, merged after ${rc}:"
+            echo "not in this release, merged after ${rc}; they go in the next candidate:"
             echo "$after"
             {
               echo "### Not in this release"
-              echo "Merged after ${rc}; the next push cuts a candidate with them."
+              echo "Merged after ${rc}; they go in the next candidate."
               echo '```'
               echo "$after"
               echo '```'
