@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/creativeprojects/go-selfupdate"
+	"github.com/giantswarm/go-selfupdate"
 )
 
 func TestNewSelfUpdateCmd(t *testing.T) {
