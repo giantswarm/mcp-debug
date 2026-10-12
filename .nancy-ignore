@@ -1,0 +1,3 @@
+# CVE-2026-108859: mcp-go through v1.2.1 (the latest) reads a Streamable HTTP POST body whole; every request body is bounded at 1 MiB meanwhile.
+# Tracked in https://github.com/giantswarm/mcp-debug/issues/197; remove by 2026-11-12.
+CVE-2026-108859 until=2026-11-12 # github.com/mark3labs/mcp-go@v1.2.1
