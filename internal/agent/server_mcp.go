@@ -3,6 +3,8 @@ package agent
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -49,14 +51,27 @@ func (m *MCPServer) Start(ctx context.Context, listenAddr string) error {
 	case "stdio":
 		return server.ServeStdio(m.mcpServer)
 	case "streamable-http":
-		httpServer := server.NewStreamableHTTPServer(
-			m.mcpServer,
-			server.WithEndpointPath("/mcp"),
-		)
-		return httpServer.Start(listenAddr)
+		srv := &http.Server{
+			Addr:              listenAddr,
+			Handler:           m.httpHandler(),
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		return srv.ListenAndServe()
 	default:
 		return fmt.Errorf("unsupported server transport: %s", m.serverTransport)
 	}
+}
+
+// maxBodyBytes bounds a request body. mcp-go reads a POST body whole before
+// validating it (CVE-2026-108859); the bound keeps that read small.
+const maxBodyBytes = 1 << 20
+
+// httpHandler serves the streamable-http transport on /mcp, every request
+// body bounded at maxBodyBytes.
+func (m *MCPServer) httpHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("/mcp", server.NewStreamableHTTPServer(m.mcpServer, server.WithEndpointPath("/mcp")))
+	return http.MaxBytesHandler(mux, maxBodyBytes)
 }
 
 // registerTools registers all MCP tools
