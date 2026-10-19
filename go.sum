@@ -112,8 +112,8 @@ github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2
 github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/frankban/quicktest v1.14.6 h1:7Xjx+VpznH+oBnejlPUj8oUpdxnVs4f8XU8WnHkI4W8=
 github.com/frankban/quicktest v1.14.6/go.mod h1:4ptaffx2x8+WTWXmUCuVU6aPUX1/Mz7zb5vbUoiM6w0=
-github.com/giantswarm/go-selfupdate v1.6.4 h1:W1SRyPly+ikboa8XetdX/mZRHmqmxUfYTNAyp3U+qiY=
-github.com/giantswarm/go-selfupdate v1.6.4/go.mod h1:ZRK84xA7SPPJ+y9c988e8UZ0MuV/QNbWT4mjwBj963I=
+github.com/giantswarm/go-selfupdate v1.6.5 h1:5H+9BX1Ki2OWToYheTrLARKg9Bguxyw7ePwIROckiwI=
+github.com/giantswarm/go-selfupdate v1.6.5/go.mod h1:ZRK84xA7SPPJ+y9c988e8UZ0MuV/QNbWT4mjwBj963I=
 github.com/giantswarm/selfupdate-cosign v0.3.7 h1:3XeihtCJCsUtgJgxDbSsT02C5mzLErUXrDO2GJiuIAg=
 github.com/giantswarm/selfupdate-cosign v0.3.7/go.mod h1:n2mecYfa336AB2fKrNzo8hQ8BTRn6GHWORl5bcvhA0c=
 github.com/go-chi/chi/v5 v5.3.0 h1:halUjDxhshgXHMrao5bB8eNBXo/rnzwr8m5m36glehM=
