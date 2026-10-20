@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/chzyer/readline v1.5.1
-	github.com/giantswarm/go-selfupdate v1.6.5
+	github.com/giantswarm/go-selfupdate v1.6.6
 	github.com/mark3labs/mcp-go v1.3.0
 	github.com/spf13/cobra v1.10.2
 )
