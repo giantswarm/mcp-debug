@@ -20,6 +20,7 @@
 ## [Unreleased]
 
 ### Fixed
+- The browser page of `mcp-debug --oauth` comes from [pagekit](https://github.com/giantswarm/pagekit), Giant Swarm's shared sign-in page design. A refusal from the authorization server and a callback without a code get a "Sign-in failed" page instead of plain text or a success page; the OAuth error code is shown only when it is a registered one.
 - Builds on Go 1.27.3 (`toolchain go1.27.3`), which fixes the standard library vulnerability GO-2026-6809 that govulncheck reports for Go 1.27.2.
 - `go.opentelemetry.io/otel`, `otel/metric` and `otel/trace` are v1.45.0, which fixes CVE-2026-81870.
 - `self-update` replaces the binary, symbolic links resolved, with a single rename (`selfupdatecosign.Install`, selfupdate-cosign v0.3.0). go-selfupdate's own swap moved the binary aside before it moved the new one in, so a process started in between found none, and concurrent updates could lose it. Now a process started meanwhile runs the old binary or the new one, several updates may run at once, and the binary keeps its mode.

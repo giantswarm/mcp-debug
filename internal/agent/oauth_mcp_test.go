@@ -105,10 +105,12 @@ func TestCreateCallbackHandler(t *testing.T) {
 			wantError:      false,
 		},
 		{
+			// The parameters still reach the caller, which reports the
+			// missing code; the page says the response is incomplete.
 			name:           "empty callback",
 			method:         http.MethodGet,
 			queryParams:    "",
-			wantStatusCode: http.StatusOK,
+			wantStatusCode: http.StatusBadRequest,
 			wantResult:     true,
 			wantError:      false,
 		},
