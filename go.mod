@@ -2,6 +2,8 @@ module github.com/giantswarm/mcp-debug
 
 go 1.26.0
 
+toolchain go1.27.3
+
 require (
 	github.com/chzyer/readline v1.5.1
 	github.com/giantswarm/go-selfupdate v1.6.6
