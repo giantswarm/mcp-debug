@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/giantswarm/pagekit"
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/client/transport"
 )
@@ -251,7 +252,10 @@ func createCallbackHandler(logger *Logger, resultChan chan<- callbackResult) htt
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Security: Only accept GET requests (standard for OAuth callbacks)
 		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			pagekit.Render(w, http.StatusMethodNotAllowed, pagekit.Page{
+				Heading: "Not supported",
+				Summary: "The sign-in callback only accepts GET requests",
+			})
 			return
 		}
 
@@ -271,22 +275,41 @@ func createCallbackHandler(logger *Logger, resultChan chan<- callbackResult) htt
 			default:
 				logger.Warning("Error occurred but callback already processed")
 			}
-			http.Error(w, "Authorization failed", http.StatusBadRequest)
+			renderSignInFailure(w, "The sign-in was denied or failed", params["error"])
 			return
 		}
 
-		// Success - send params
+		// Send params; the caller checks the state and the code.
 		select {
 		case resultChan <- callbackResult{params: params}:
 		default:
 			logger.Warning("Callback received but already processed")
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if _, err := w.Write([]byte(`<html><head><meta charset="utf-8"></head><body><h1>✅ Authorization Successful!</h1><p>You can close this window.</p></body></html>`)); err != nil {
-			logger.Warning("Failed to write response: %v", err)
+		if params["code"] == "" {
+			renderSignInFailure(w, "The sign-in response is incomplete", "")
+			return
 		}
+		pagekit.Render(w, http.StatusOK, pagekit.Page{
+			Title:   "Signed in with mcp-debug",
+			Heading: "Signed in",
+			Summary: "mcp-debug is now signed in",
+			Message: "You can close this tab and return to where you started the sign-in.",
+		})
 	}
+}
+
+// renderSignInFailure writes the page for a failed sign-in. errorCode is
+// shown only when it is a registered OAuth error code: anyone can send the
+// browser to the local callback with an error of their choosing.
+func renderSignInFailure(w http.ResponseWriter, summary, errorCode string) {
+	pagekit.Render(w, http.StatusBadRequest, pagekit.Page{
+		Title:   "Sign-in with mcp-debug failed",
+		Heading: "Sign-in failed",
+		Summary: summary,
+		Message: "You can close this tab and start the sign-in again from where you started it.",
+		Detail:  pagekit.OAuthErrorCode(errorCode),
+	})
 }
 
 // validateBrowserURL validates that a URL is safe to open in a browser.
