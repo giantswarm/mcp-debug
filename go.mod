@@ -8,7 +8,7 @@ require (
 	github.com/chzyer/readline v1.5.1
 	github.com/giantswarm/go-selfupdate v1.6.7
 	github.com/giantswarm/pagekit v0.3.1
-	github.com/mark3labs/mcp-go v1.3.0
+	github.com/mark3labs/mcp-go v1.4.0
 	github.com/spf13/cobra v1.10.2
 )
 
