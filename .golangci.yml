@@ -9,6 +9,9 @@
 # convention (see giantswarm/mcp-kubernetes; giantswarm/devctl#1802).
 version: "2"
 linters:
+  enable:
+    - gosec
+    - goconst
   settings:
     goconst:
       min-len: 5
