@@ -116,8 +116,8 @@ github.com/giantswarm/go-selfupdate v1.7.1 h1:43DYFwLqIKRC2iIJqLykRAw4hwuSwqSadq
 github.com/giantswarm/go-selfupdate v1.7.1/go.mod h1:nqRW1Io8Ixo3x8tSnLKkpfenWn2PRf/Zcu548PZp780=
 github.com/giantswarm/pagekit v0.3.2 h1:YDnxBOzBcrBrc1J8XArl3J83JrD/CdtWQ0GuDkDprBo=
 github.com/giantswarm/pagekit v0.3.2/go.mod h1:bXMRzjARa/TewLywz4naTh8YsGzbfSLUoGlEfM92oPQ=
-github.com/giantswarm/selfupdate-cosign v0.3.15 h1:pz0QtJ2IJv7z6ladhRL6UsP4wPjnnjdHQ5Uz6MlC/Tc=
-github.com/giantswarm/selfupdate-cosign v0.3.15/go.mod h1:FpzA2Pz3VJJHWF6g5w94B+HBYizqytKqIvbE3MXvogk=
+github.com/giantswarm/selfupdate-cosign v0.3.16 h1:ukTOCmEhf+0gYn6bKicirjjl+rIYYtkligpM5OkNZVA=
+github.com/giantswarm/selfupdate-cosign v0.3.16/go.mod h1:FpzA2Pz3VJJHWF6g5w94B+HBYizqytKqIvbE3MXvogk=
 github.com/go-chi/chi/v5 v5.3.0 h1:halUjDxhshgXHMrao5bB8eNBXo/rnzwr8m5m36glehM=
 github.com/go-chi/chi/v5 v5.3.0/go.mod h1:R+tYY2hNuVUUjxoPtqUdgBqevM9s9njzkTLutVsOCto=
 github.com/go-fed/httpsig v1.1.0 h1:9M+hb0jkEICD8/cAiNqEB66R87tTINszBRTjwjQzWcI=
