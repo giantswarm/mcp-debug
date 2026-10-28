@@ -1,3 +1,14 @@
-# CVE-2026-108859: mcp-go through v1.2.1 (the latest) reads a Streamable HTTP POST body whole; every request body is bounded at 1 MiB meanwhile.
-# Tracked in https://github.com/giantswarm/mcp-debug/issues/197; remove by 2026-11-12.
 CVE-2026-108859 until=2026-11-12 # github.com/mark3labs/mcp-go@v1.2.1
+CVE-2026-33815 until=2026-11-27 # github.com/jackc/pgx/v5@v5.8.0 since=2026-10-28
+CVE-2026-33816 until=2026-11-27 # github.com/jackc/pgx/v5@v5.8.0 since=2026-10-28
+CVE-2026-41889 until=2026-11-27 # github.com/jackc/pgx/v5@v5.8.0 since=2026-10-28
+CVE-2026-63209 until=2026-11-27 # github.com/klauspost/compress@v1.18.6 since=2026-10-28
+CVE-2026-42154 until=2026-11-27 # github.com/prometheus/prometheus@v0.51.0 since=2026-10-28
+CVE-2026-40179 until=2026-11-27 # github.com/prometheus/prometheus@v0.51.0 since=2026-10-28
+CVE-2021-43668 until=2026-11-27 # github.com/syndtr/goleveldb@v1.0.1-0.20220721030215-126854af5e6d since=2026-10-28
+CVE-2026-33343 until=2026-11-27 # go.etcd.io/etcd/v3@v3.6.8 since=2026-10-28
+CVE-2026-33413 until=2026-11-27 # go.etcd.io/etcd/v3@v3.6.8 since=2026-10-28
+CVE-2026-44283 until=2026-11-27 # go.etcd.io/etcd/v3@v3.6.8 since=2026-10-28
+CVE-2026-59818 until=2026-11-27 # go.etcd.io/etcd/v3@v3.6.8 since=2026-10-28
+CVE-2026-73500 until=2026-11-27 # go.etcd.io/etcd/v3@v3.6.8 since=2026-10-28
+CVE-2026-81870 until=2026-11-27 # go.opentelemetry.io/otel/exporters/otlp/otlptrace@v1.34.0 since=2026-10-28
