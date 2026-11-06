@@ -19,6 +19,9 @@
 
 ## [Unreleased]
 
+### Added
+- The server advertises the Giant Swarm logo as its MCP icon (`serverInfo.icons`), so muster and the developer portal show it.
+
 ### Fixed
 - The browser page of `mcp-debug --oauth` comes from [pagekit](https://github.com/giantswarm/pagekit), Giant Swarm's shared sign-in page design. A refusal from the authorization server and a callback without a code get a "Sign-in failed" page instead of plain text or a success page; the OAuth error code is shown only when it is a registered one.
 - Builds on Go 1.27.3 (`toolchain go1.27.3`), which fixes the standard library vulnerability GO-2026-6809 that govulncheck reports for Go 1.27.2.
