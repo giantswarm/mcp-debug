@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/giantswarm/mcp-toolkit/brand"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -28,6 +29,7 @@ func NewMCPServer(client *Client, serverTransport string, logger *Logger, notify
 		server.WithToolCapabilities(notifyClients),
 		server.WithResourceCapabilities(false, false),
 		server.WithPromptCapabilities(false),
+		brand.WithGiantSwarmIcon(),
 	)
 
 	ms := &MCPServer{

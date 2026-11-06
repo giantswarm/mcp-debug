@@ -1,10 +1,14 @@
 package agent
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/giantswarm/mcp-toolkit/brand"
+	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // A body beyond the bound is refused, and the endpoint keeps answering.
@@ -36,5 +40,26 @@ func TestMCPBodyIsBounded(t *testing.T) {
 	}
 	if got := post(`{"jsonrpc":"2.0","id":2,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"0"}}}`); got != http.StatusOK {
 		t.Errorf("initialize: status %d, want 200", got)
+	}
+}
+
+// The initialize result names the Giant Swarm logo as the server's icon.
+func TestMCPServerAdvertisesIcon(t *testing.T) {
+	ms, err := NewMCPServer(nil, "streamable-http", nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg := ms.mcpServer.HandleMessage(context.Background(), []byte(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"0"}}}`))
+	resp, ok := msg.(mcp.JSONRPCResponse)
+	if !ok {
+		t.Fatalf("initialize: got %T, want a response", msg)
+	}
+	result, ok := resp.Result.(mcp.InitializeResult)
+	if !ok {
+		t.Fatalf("initialize result: got %T", resp.Result)
+	}
+	want := brand.GiantSwarmIcon()
+	if got := result.ServerInfo.Icons; len(got) != 1 || got[0].Src != want.Src || got[0].MIMEType != want.MIMEType {
+		t.Errorf("serverInfo.icons = %v, want the Giant Swarm icon", got)
 	}
 }
