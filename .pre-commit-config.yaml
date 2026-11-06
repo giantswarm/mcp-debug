@@ -2,7 +2,7 @@
 #
 #    devctl
 #
-#    https://github.com/giantswarm/devctl/blob/95d98f7c606e2f51e53c284b5f1410044b36ea20/pkg/gen/input/precommit/internal/file/pre-commit-config.yaml.template
+#    https://github.com/giantswarm/devctl/blob/70705527cb6300cabe9bd3ba6af5bdf9bf0ae1dd/pkg/gen/input/precommit/internal/file/pre-commit-config.yaml.template
 #
 minimum_pre_commit_version: '2.17'
 default_install_hook_types: [pre-commit, commit-msg]
@@ -51,6 +51,8 @@ repos:
       - id: go-mod-tidy
       - id: golangci-lint
         args:
+          # Let independent sessions and worktrees lint at the same time.
+          - --allow-parallel-runners
           # No --timeout: golangci-lint v2 has none by default and a flag would
           # override a repo's `run.timeout` in .golangci.yml, its place to set one.
           # List all issues found
