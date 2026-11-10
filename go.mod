@@ -117,4 +117,4 @@ require (
 // here imports golang.org/x/mod, so go mod tidy resolves it to the version the
 // dependency graph asks for (v0.38.0, CVE-2026-56864/56865); the replace holds
 // the fixed release.
-replace golang.org/x/mod => golang.org/x/mod v0.42.0
+replace golang.org/x/mod => golang.org/x/mod v0.43.0
