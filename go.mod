@@ -7,7 +7,7 @@ toolchain go1.27.4
 require (
 	github.com/chzyer/readline v1.5.1
 	github.com/giantswarm/go-selfupdate v1.7.7
-	github.com/giantswarm/mcp-toolkit v0.7.0
+	github.com/giantswarm/mcp-toolkit v0.11.0
 	github.com/giantswarm/pagekit v0.3.8
 	github.com/giantswarm/selfupdate-cosign v0.3.30
 	github.com/mark3labs/mcp-go v1.6.0
